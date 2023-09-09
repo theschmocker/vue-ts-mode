@@ -18,7 +18,7 @@
 ;;
 ;;; Code:
 
-(eval-when-compile
+(eval-and-compile
   (require 'cl-lib))
 
 (require 'treesit)
@@ -453,11 +453,9 @@ takes a treesit-node as an argument and perform the same NODE-TYPE comparison"
     (lambda (node)
       (equal node-type (treesit-node-type node)))))
 
-(defun vue-ts-mode--treesit-parent-element (node)
-  "Return the nearest parent of NODE which has type \"element\"."
-  (treesit-parent-until
-   node
-   (vue-ts-mode--treesit-node-type-p "element")))
+(defun vue-ts-mode--treesit-find-child (node pred)
+  "Return the first child of NODE which satisfies PRED."
+  (car (treesit-filter-child node pred)))
 
 (defun vue-ts-mode--treesit-previous-sibling-start-tag (node)
   "Return the nearest sibling of NODE which has type \"start_tag\"."
@@ -493,6 +491,92 @@ takes a treesit-node as an argument and perform the same NODE-TYPE comparison"
                    (list 'self-insert-command
                          (key-binding [remap self-insert-command]))))
     (vue-ts-mode--close-tag)))
+
+;;; Navigation
+
+(defun vue-ts-mode--element-at-pos (&optional pos)
+  "Return the treesit-node of the nearest element around POS.
+
+The returned node will have type \"element\", \"template_element\",
+\"script_element\", or \"style_element\"."
+  (let ((pos (or pos (point))))
+    (treesit-parent-until
+     (treesit-node-at pos 'vue)
+     (lambda (n)
+       (string-match-p (regexp-opt (list "template_element" "element" "script_element" "style_element"))
+                       (treesit-node-type n))))))
+
+(defun vue-ts-mode--treesit-node-contains-pos-p (node pos)
+  "Return t if POS is between NODE's start and end."
+  (<= (treesit-node-start node)
+      pos
+      (treesit-node-end node)))
+
+(defun vue-ts-mode--element-goto-tag (pos target)
+  "Move point to the start of TARGET tag of the element at POS.
+
+Target is a symbol whose value is one of start, end, or match."
+  (forward-to-indentation 0)
+
+  (if (< pos (point))
+      (setq pos (point))
+    (goto-char pos))
+
+  (when-let ((element (vue-ts-mode--element-at-pos pos)))
+    (if-let ((self-closing-tag (vue-ts-mode--treesit-find-child
+                                element
+                                (vue-ts-mode--treesit-node-type-p "self_closing_tag"))))
+        (goto-char (treesit-node-start self-closing-tag))
+      (when-let ((start-tag (vue-ts-mode--treesit-find-child
+                             element
+                             (vue-ts-mode--treesit-node-type-p "start_tag")))
+                 (end-tag (vue-ts-mode--treesit-find-child
+                           element
+                           (vue-ts-mode--treesit-node-type-p "end_tag"))))
+        (cl-ecase target
+          (end (goto-char (treesit-node-start end-tag)))
+          (start (goto-char (treesit-node-start start-tag)))
+          (match
+           (cond ((vue-ts-mode--element-match-goto-end-p start-tag end-tag pos)
+                  (goto-char (treesit-node-start end-tag)))
+                 ((vue-ts-mode--element-match-goto-start-p start-tag end-tag pos)
+                  (goto-char (treesit-node-start start-tag)))
+                 (t (goto-char (treesit-node-start end-tag))))))))))
+
+(defun vue-ts-mode-element-match (pos)
+  "Move point to the related start/end of the tag at POS."
+  (interactive "d")
+  (vue-ts-mode--element-goto-tag pos 'match))
+
+(defun vue-ts-mode--pos-directly-between-tags-p (start-tag end-tag pos)
+  "Return t if POS is directly between START-TAG and END-TAG.
+
+For example: <tag>|</tag>, but not <tag> |</tag>."
+  (and (eql pos (treesit-node-end start-tag))
+       (eql pos (treesit-node-start end-tag))))
+
+(defun vue-ts-mode--element-match-goto-end-p (start-tag end-tag pos)
+  "Return t if point should move to the end tag of the element at POS."
+  (and (not (vue-ts-mode--pos-directly-between-tags-p start-tag end-tag pos))
+       (or (vue-ts-mode--treesit-node-contains-pos-p start-tag pos)
+           (and (not (vue-ts-mode--treesit-node-contains-pos-p end-tag pos))
+                (let ((current-line (line-number-at-pos pos))
+                      (start-tag-start-line (line-number-at-pos (treesit-node-start start-tag)))
+                      (start-tag-end-line (line-number-at-pos (treesit-node-end start-tag))))
+                  (or (eql current-line start-tag-start-line)
+                      (eql current-line start-tag-end-line)))))))
+
+(defun vue-ts-mode--element-match-goto-start-p (start-tag end-tag pos)
+  "Return t if point should move to the end tag of the element at POS."
+  (print (list pos (treesit-node-end start-tag) (treesit-node-start end-tag)))
+  (or (vue-ts-mode--treesit-node-contains-pos-p end-tag pos)
+      (vue-ts-mode--pos-directly-between-tags-p start-tag end-tag pos)
+      (let ((current-line (line-number-at-pos pos))
+            (end-tag-start-line (line-number-at-pos (treesit-node-start end-tag)))
+            (end-tag-end-line (line-number-at-pos (treesit-node-end end-tag))))
+        (and (not (vue-ts-mode--treesit-node-contains-pos-p start-tag pos))
+             (or (eql current-line end-tag-start-line)
+                 (eql current-line end-tag-end-line))))))
 
 (provide 'vue-ts-mode)
 ;;; vue-ts-mode.el ends here

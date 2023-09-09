@@ -23,6 +23,10 @@ A work-in-progress tree-sitter-based major mode for Vue.
 ** Extras
 *** Auto-close HTML tags
 Enabled by default. Disable it using the custom variable =vue-ts-mode-auto-close-tags=.
+*** Structural Navigation
+Note that, at time of writing, none of these are bound to any keymap.
+- =vue-ts-mode-element-match=: jump between the start/end tags of the element at point.
+
 
 ** Acknowledgements
 Some workarounds come from [[https://github.com/Sorixelle/astro-ts-mode/tree/207e5da093aa8141b9dd2f5e98afd8952832b4b0][astro-ts-mode]]

@@ -1,0 +1,24 @@
+#+title: vue-ts-mode
+
+A work-in-progress tree-sitter-based major mode for Vue.
+
+** Working
+- <template> font lock
+  /Mostly/ working. Interpolations aren't highlighted correctly as JS/TS. The current tree-sitter integration in Emacs treats all embedded language ranges as a single document of that language, combined. At best, font-locking /sometimes/ works. At worst, I've run into Emacs freezing completely. I'm experimenting with creating an individual parser per interpolation, but I've not had much success with it and I'm not sure what the performance will look like for larger components. If I can get it to function, I may put it behind a flag that's off by default
+- <script> font lock
+  Also mostly working. Only targets <script ...> and <script ... lang="ts">.
+  Not working with other script types. Sometimes breaks for reasons that I haven't quite determined
+
+  There's code in the current built-in js/ts tree-sitter font lock settings that breaks on new versions of the parsers. It's /supposed/ to handle the differences in parser versions, but it doesn't work correctly. I've got some advice in my personal config that fixes it, but I'm unsure as to whether or not I'll include that here.
+
+- <style> font lock
+  Only plain CSS so far
+
+- Indentation
+  Seems to work alright, but more tweaking necessary
+
+- imenu
+  Top level <template>, <script>, and <style> tags included in imenu, as well as the simple entries from typescript-ts-mode. Would like to add JS, CSS, and possibly more granular <template> entries
+
+** Acknowledgements
+Some workarounds come from [[https://github.com/Sorixelle/astro-ts-mode/tree/207e5da093aa8141b9dd2f5e98afd8952832b4b0][astro-ts-mode]]

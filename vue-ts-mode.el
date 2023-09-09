@@ -18,6 +18,9 @@
 ;;
 ;;; Code:
 
+(eval-when-compile
+  (require 'cl-lib))
+
 (require 'treesit)
 (require 'typescript-ts-mode)
 (require 'js)
@@ -27,6 +30,9 @@
   "Number of spaces for each indentation step in `vue-ts-mode'.
 
 Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
+
+(defcustom vue-ts-mode-auto-close-tags t
+  "Automatically insert a closing tag name after typing \"</\".")
 
 (defvar vue-ts-mode--indent-rules
   `((vue
@@ -253,6 +259,7 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
 (defun vue-ts-mode--js-tag-p (raw-text-node)
   (or (vue-ts-mode--script-no-lang-p raw-text-node)
       (vue-ts-mode--start-tag-lang-js-p raw-text-node)))
+
 (defun vue-ts-mode--point-in-range-p (point range)
   (when range
     (<= (car range) point (cdr range))))
@@ -389,6 +396,8 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
   (modify-syntax-entry ?=  "." vue-ts-mode-syntax-table)
   (setq-local imenu-create-index-function #'vue-ts-mode-imenu-index)
 
+  (add-hook 'post-command-hook #'vue-ts-mode--auto-close-tag-post-command-h nil t)
+
   (treesit-major-mode-setup))
 
 (defvar-local vue-ts-mode--interpolation-parsers nil)
@@ -433,6 +442,57 @@ instead always returns t."
 ;;  #'treesit--merge-ranges
 ;;  :before-while
 ;;  #'vue-ts-mode--advice-for-treesit--merge-ranges)
+
+(cl-defun vue-ts-mode--treesit-node-type-p (node-type &optional (node nil node-provided))
+  "Return t if NODE's type is equal to the string NODE-TYPE.
+
+This is a curried function. If NODE is not provided, return a function which
+takes a treesit-node as an argument and perform the same NODE-TYPE comparison"
+  (if node-provided
+      (equal node-type (treesit-node-type node))
+    (lambda (node)
+      (equal node-type (treesit-node-type node)))))
+
+(defun vue-ts-mode--treesit-parent-element (node)
+  "Return the nearest parent of NODE which has type \"element\"."
+  (treesit-parent-until
+   node
+   (vue-ts-mode--treesit-node-type-p "element")))
+
+(defun vue-ts-mode--treesit-previous-sibling-start-tag (node)
+  "Return the nearest sibling of NODE which has type \"start_tag\"."
+  (let (start-tag)
+    (while-let ((prev (and node (treesit-node-prev-sibling node t))))
+      (if (vue-ts-mode--treesit-node-type-p "start_tag" prev)
+          (progn
+            (setq start-tag prev)
+            (setq node nil))
+        (setq node prev)))
+    start-tag))
+
+(defun vue-ts-mode--close-tag ()
+  "Close the nearest start tag when \"</\" is before point."
+  (when (looking-back "</" (- (point) 2))
+    (when-let* ((current-node (treesit-node-at (point)))
+                (start-tag (vue-ts-mode--treesit-previous-sibling-start-tag current-node))
+                (start-tag-name (car (treesit-filter-child
+                                      start-tag
+                                      (vue-ts-mode--treesit-node-type-p "tag_name"))))
+                (start-tag-end-pos (treesit-node-end start-tag)))
+      (let ((before-close-tag (- (point) 2)))
+        (insert (treesit-node-text start-tag-name t))
+        (insert ?\>)
+        (when (eql start-tag-end-pos before-close-tag)
+          (goto-char start-tag-end-pos))
+        (indent-according-to-mode)))))
+
+(defun vue-ts-mode--auto-close-tag-post-command-h ()
+  "Run `vue-ts-mode--close-tag' after \"</\" inserted in `post-command-hook'."
+  (when (and vue-ts-mode-auto-close-tags
+             (memq this-command
+                   (list 'self-insert-command
+                         (key-binding [remap self-insert-command]))))
+    (vue-ts-mode--close-tag)))
 
 (provide 'vue-ts-mode)
 ;;; vue-ts-mode.el ends here

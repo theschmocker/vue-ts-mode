@@ -48,8 +48,20 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil."
   :group 'vue-ts
   :type '(boolean))
 
+(defun vue-ts-mode--comment-end-matcher (node parent bol)
+  "Match the closing \"-->\" on its own line in a comment node.
+
+See `treesit-simple-indent-rules' for info about the NODE, PARENT, and BOL
+arguments to the matcher function."
+  (print (list node parent bol))
+  (and (vue-ts-mode--treesit-node-type-p "comment" parent)
+       (save-excursion
+         (goto-char bol)
+         (looking-at "-->" t))))
+
 (defvar vue-ts-mode--indent-rules
   `((vue
+     (vue-ts-mode--comment-end-matcher parent-bol 0)
      ((parent-is "component") column-0 0)
      ((node-is "element") parent-bol vue-ts-mode-indent-offset)
      ((node-is "start_tag") parent-bol 0)
@@ -64,7 +76,8 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil."
      ((node-is "directive_attribute") parent-bol vue-ts-mode-indent-offset)
      ((parent-is "quoted_attribute_value") parent-bol 0)
      ((parent-is "attribute_value") parent-bol 0)
-     ((node-is "interpolation") parent-bol vue-ts-mode-indent-offset))))
+     ((node-is "interpolation") parent-bol vue-ts-mode-indent-offset)
+     ((parent-is "comment") parent-bol vue-ts-mode-indent-offset))))
 
 (defface vue-ts-mode-html-tag-face
   '((t . (:inherit font-lock-function-name-face)))
@@ -128,7 +141,7 @@ major modes."
   (append
    (treesit-font-lock-rules
     :language 'vue
-    :feature 'html
+    :feature 'vue-template
     `(((tag_name) @vue-ts-mode-html-tag-face)
 
       (quoted_attribute_value "\"" @vue-ts-mode-attribute-value-face)
@@ -150,10 +163,12 @@ major modes."
       ["<" ">" "</" "/>"] @font-lock-bracket-face
 
       (interpolation
-       ["{{" "}}"] @font-lock-bracket-face ))
+       ["{{" "}}"] @font-lock-bracket-face )
+
+      (comment) @font-lock-comment-face)
 
     :language 'vue
-    :feature 'html
+    :feature 'vue-template
     :override t
     `(((tag_name) @vue-ts-mode-builtin-tag-face
        (:match ,(regexp-opt vue-ts-mode-builtin-tags) @vue-ts-mode-builtin-tag-face))
@@ -162,7 +177,7 @@ major modes."
        (:match "^\\(#\\|@\\|:\\)" @vue-ts-mode-shorthand-prefix-face)))
 
     :language 'vue
-    :feature 'html
+    :feature 'vue-template
     :override t
     `(((component
         :anchor
@@ -317,8 +332,7 @@ RANGE should be a cons cell of numbers: (start . end)."
               (append "{}():;,<>/=" electric-indent-chars))
 
   (setq-local treesit-font-lock-feature-list
-              '((
-                 html comment declaration interpolation
+              '((vue-template
                  vue-typescript-comment
                  vue-typescript-declaration
                  vue-javascript-comment
@@ -327,6 +341,7 @@ RANGE should be a cons cell of numbers: (start . end)."
                  vue-css-comment
                  vue-css-query
                  vue-css-keyword)
+
                 (vue-typescript-keyword
                  vue-typescript-string
                  vue-typescript-escape-sequence
@@ -335,14 +350,13 @@ RANGE should be a cons cell of numbers: (start . end)."
                  vue-css-property
                  vue-css-constant
                  vue-css-string)
-                (
-                 vue-typescript-constant
+
+                (vue-typescript-constant
                  vue-typescript-expression
                  vue-typescript-identifier
                  vue-typescript-number
                  vue-typescript-pattern
                  vue-typescript-property
-
                  vue-javascript-assignment
                  vue-javascript-constant
                  vue-javascript-escape-sequence
@@ -350,12 +364,12 @@ RANGE should be a cons cell of numbers: (start . end)."
                  vue-javascript-number
                  vue-javascript-pattern
                  vue-javascript-string-interpolation
-
                  vue-css-error
                  vue-css-variable
                  vue-css-function
                  vue-css-operator
                  vue-css-bracked)
+
                 (vue-typescript-function
                  vue-typescript-bracket
                  vue-typescript-delimiter

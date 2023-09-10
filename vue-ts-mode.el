@@ -444,14 +444,14 @@ instead always returns t."
 ;;  #'vue-ts-mode--advice-for-treesit--merge-ranges)
 
 (cl-defun vue-ts-mode--treesit-node-type-p (node-type &optional (node nil node-provided))
-  "Return t if NODE's type is equal to the string NODE-TYPE.
+  "Return t if NODE's type is matches the regexp NODE-TYPE.
 
 This is a curried function. If NODE is not provided, return a function which
 takes a treesit-node as an argument and perform the same NODE-TYPE comparison"
   (if node-provided
-      (equal node-type (treesit-node-type node))
+      (string-match-p node-type (treesit-node-type node))
     (lambda (node)
-      (equal node-type (treesit-node-type node)))))
+      (string-match-p node-type (treesit-node-type node)))))
 
 (defun vue-ts-mode--treesit-find-child (node pred)
   "Return the first child of NODE which satisfies PRED."
@@ -494,6 +494,9 @@ takes a treesit-node as an argument and perform the same NODE-TYPE comparison"
 
 ;;; Navigation
 
+(defconst vue-ts-mode--element-node-type-regexp
+  (regexp-opt (list "template_element" "element" "script_element" "style_element")))
+
 (defun vue-ts-mode--element-at-pos (&optional pos)
   "Return the treesit-node of the nearest element around POS.
 
@@ -503,7 +506,7 @@ The returned node will have type \"element\", \"template_element\",
     (treesit-parent-until
      (treesit-node-at pos 'vue)
      (lambda (n)
-       (string-match-p (regexp-opt (list "template_element" "element" "script_element" "style_element"))
+       (string-match-p vue-ts-mode--element-node-type-regexp
                        (treesit-node-type n))))))
 
 (defun vue-ts-mode--treesit-node-contains-pos-p (node pos)
@@ -577,6 +580,31 @@ For example: <tag>|</tag>, but not <tag> |</tag>."
         (and (not (vue-ts-mode--treesit-node-contains-pos-p start-tag pos))
              (or (eql current-line end-tag-start-line)
                  (eql current-line end-tag-end-line))))))
+
+(defun vue-ts-mode--get-all-elements ()
+  (flatten-tree (treesit-induce-sparse-tree
+                 (treesit-buffer-root-node 'vue)
+                 (vue-ts-mode--treesit-node-type-p
+                  vue-ts-mode--element-node-type-regexp))))
+
+(defun vue-ts-mode-element-next (pos)
+  "Move point to the beginning of the nearest HTML element after POS."
+  (interactive "d")
+  (when-let* ((elements (vue-ts-mode--get-all-elements))
+               (next-element (cl-find-if (lambda (n)
+                                           (and n (< pos (treesit-node-start n))))
+                                         elements)))
+     (goto-char (treesit-node-start next-element))))
+
+(defun vue-ts-mode-element-previous (pos)
+  "Move point to the beginning of the nearest HTML element at or before POS."
+  (interactive "d")
+  (when-let* ((elements (vue-ts-mode--get-all-elements)))
+    (cl-loop for el in elements
+             for next in (cdr elements)
+             if (and (> pos (treesit-node-start el))
+                     (<= pos (treesit-node-start next)))
+             return (goto-char (treesit-node-start el)))))
 
 (provide 'vue-ts-mode)
 ;;; vue-ts-mode.el ends here

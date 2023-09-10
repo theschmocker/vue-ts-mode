@@ -616,5 +616,52 @@ For example: <tag>|</tag>, but not <tag> |</tag>."
                      (<= pos (treesit-node-start next)))
              return (goto-char (treesit-node-start el)))))
 
+;;; Tranformations
+
+(defun vue-ts-mode--swap-nodes (node-a node-b)
+  "Swap NODE-A and NODE-B in the buffer."
+  (pcase-let ((`(,node-a-start . ,node-a-end)
+               (vue-ts-mode--treesit-create-node-markers node-a))
+              (`(,node-b-start . ,node-b-end)
+               (vue-ts-mode--treesit-create-node-markers node-b)))
+    (let ((node-a-contents (treesit-node-text node-a))
+          (node-b-contents (treesit-node-text node-b)))
+      (atomic-change-group
+        (delete-region node-a-start node-a-end)
+        (delete-region node-b-start node-b-end)
+        (goto-char node-a-start)
+        (insert node-b-contents)
+        (goto-char node-b-start)
+        (insert node-a-contents)
+        (goto-char node-b-start))
+      (set-marker node-a-start nil)
+      (set-marker node-a-end nil)
+      (set-marker node-b-start nil)
+      (set-marker node-b-end nil))))
+
+(defun vue-ts-mode--treesit-create-node-markers (node)
+  "Return a cons cell containing markers for NODE's start and end positions."
+  (cons (copy-marker (treesit-node-start node) nil)
+        (copy-marker (treesit-node-end node) t)))
+
+(defun vue-ts-mode-element-transpose (pos &optional backward)
+  "Swap the element at POS and its sibling.
+
+If a prefix argument is supplied for BACKWARD, swap the element with its
+previous sibling."
+  (interactive (list (point) current-prefix-arg))
+  (forward-to-indentation 0)
+
+  (if (< pos (point))
+      (setq pos (point))
+    (goto-char pos))
+
+  (when-let* ((element (vue-ts-mode--element-at-pos pos))
+              (sibling (vue-ts-mode--treesit-sibling-until
+                        element
+                        vue-ts-mode--element-node-type-regexp
+                        backward)))
+    (vue-ts-mode--swap-nodes element sibling)))
+
 (provide 'vue-ts-mode)
 ;;; vue-ts-mode.el ends here

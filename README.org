@@ -27,6 +27,9 @@ Enabled by default. Disable it using the custom variable =vue-ts-mode-auto-close
 Note that, at time of writing, none of these are bound to any keymap.
 - =vue-ts-mode-element-match=: jump between the start/end tags of the element at point.
 - =vue-ts-mode-element-next= / =vue-ts-mode-element-previous=: jump to start of the next/previous element from point.
+*** Structural Editing
+Note that, at time of writing, none of these are bound to any keymap.
+- =vue-ts-mode-element-transpose=: swap the element at point with its sibling. Swap with previous sibling if a prefix arg is provided.
 
 
 ** Acknowledgements

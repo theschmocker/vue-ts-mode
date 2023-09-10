@@ -26,13 +26,27 @@
 (require 'js)
 (require 'css-mode)
 
+(defvar editorconfig-indentation-alist)
+
+(when (and (featurep 'editorconfig)
+           (not (assq 'vue-ts-mode editorconfig-indentation-alist)))
+  (add-to-list 'editorconfig-indentation-alist (list 'vue-ts-mode 'vue-ts-mode-indent-offset)))
+
+(defgroup vue-ts nil
+  "Group for `vue-ts-mode'."
+  :group 'languages)
+
 (defcustom vue-ts-mode-indent-offset 4
   "Number of spaces for each indentation step in `vue-ts-mode'.
 
-Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
+Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil."
+  :group 'vue-ts
+  :type '(integer))
 
 (defcustom vue-ts-mode-auto-close-tags t
-  "Automatically insert a closing tag name after typing \"</\".")
+  "Automatically insert a closing tag name after typing \"</\"."
+  :group 'vue-ts
+  :type '(boolean))
 
 (defvar vue-ts-mode--indent-rules
   `((vue
@@ -54,57 +68,56 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
 
 (defface vue-ts-mode-html-tag-face
   '((t . (:inherit font-lock-function-name-face)))
-
-  "Face for html tags."
-  ;; :group 'web-mode-faces
-  )
+  "Face for html tags.")
 
 (defface vue-ts-mode-builtin-tag-face
   '((t . (:inherit font-lock-builtin-face)))
-
-  "Face for Vue builtin tags, like template, component, transition, etc."
-  )
+  "Face for Vue builtin tags, like template, component, transition, etc.")
 
 (defface vue-ts-mode-sfc-tag-face
   '((t . (:inherit font-lock-keyword-face)))
-
-  "Face for Vue builtin tags, like template, script, and style."
-  )
+  "Face for Vue builtin tags, like template, script, and style.")
 
 (defface vue-ts-mode-attribute-face
   '((t . (:inherit font-lock-constant-face)))
-
-  "Face for html tags."
-  )
+  "Face for html attributes.")
 
 (defface vue-ts-mode-attribute-value-face
   '((t . (:inherit font-lock-string-face)))
-  "Face for attribute values")
+  "Face for html attribute values.")
 
 (defface vue-ts-mode-builtin-directive-face
   '((t . (:inherit font-lock-builtin-face)))
-  "Face for built-in directive names")
+  "Face for built-in directive names.")
 
 (defface vue-ts-mode-dynamic-directive-argument-face
   '((t . (:inherit font-lock-variable-name-face)))
-  "Face for dynamic directive arguments, e.g. :[arg]")
+  "Face for dynamic directive arguments, e.g. :[arg].")
 
 (defface vue-ts-mode-shorthand-prefix-face
   '((t . (:inherit font-lock-bracket-face)))
-  "Face for characters in shorthand directives like the # in #slot-name or @ in @click")
+  "Face for characters in shorthand directives.
+Ex: the # in #slot-name or @ in @click")
 
 (defvar vue-ts-mode-builtin-directives
   '("v-text" "v-html" "v-show" "v-if" "v-else" "v-else-if" "v-for" "v-on"
-    "v-bind" "v-model" "v-slot" "v-pre" "v-once" "v-memo" "v-cloak"))
+    "v-bind" "v-model" "v-slot" "v-pre" "v-once" "v-memo" "v-cloak")
+  "Built-in directive attribute names.")
 
 (defvar vue-ts-mode-sfc-tags
-  '("template" "script" "style"))
+  '("template" "script" "style")
+  "Top-level SFC tag names.")
 
 (defvar vue-ts-mode-builtin-tags
-  '("template" "component" "transition"))
+  '("template" "component" "transition")
+  "Tag names of built-in Vue elements/components.")
 
 (defun vue-ts-mode--prefix-sub-language-feature (language font-lock-settings)
-  ""
+  "Add \"vue-\" + LANGUAGE prefix to feature names in FONT-LOCK-SETTINGS.
+
+FONT-LOCK-SETTINGS is a list of rules suitable for `treesit-font-lock-settings'.
+Helps with re-use of font lock rules for nested languages from their respective
+major modes."
   (let ((prefix (concat "vue-" (symbol-name language) "-")))
     (cl-loop for rule in font-lock-settings
              for rule-copy = (cl-copy-list rule)
@@ -160,15 +173,23 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
    (vue-ts-mode--prefix-sub-language-feature
     'typescript
     (typescript-ts-mode--font-lock-settings 'typescript))
-   (vue-ts-mode--prefix-sub-language-feature
-    'javascript
-    js--treesit-font-lock-settings)
+   ;; (vue-ts-mode--prefix-sub-language-feature
+   ;;  'javascript
+   ;;  js--treesit-font-lock-settings)
    (vue-ts-mode--prefix-sub-language-feature
     'css
-    css--treesit-settings)))
+    css--treesit-settings))
+  "`treesit-font-lock-settings' for `vue-ts-mode'.")
 
 (defun vue-ts-mode--sfc-element-imenu-index (root simple-imenu-settings defun-name-function)
-  ""
+  "Create an imenu index for nested language tags.
+
+This is a modified version of `treesit-simple-imenu'.
+
+ROOT is the root node for the nested language.
+SIMPLE-IMENU-SETTINGS is a list suitable for `treesit-simple-imenu'.
+DEFUN-NAME-FUNCTION is a function suitable for `treesit-defun-name-function'
+that works for the specific nested language."
   (mapcan (lambda (setting)
             (pcase-let ((`(,category ,regexp ,pred ,name-fn)
                          setting))
@@ -182,22 +203,10 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
                   index))))
           simple-imenu-settings))
 
-(defun vue-ts-mode--get-sfc-language-element-data (el)
-  ""
-  (if-let ((contents
-            (car (treesit-filter-child
-                  el
-                  (lambda (c)
-                    (equal "raw_text" (treesit-node-type c)))))))
-      (let ((lang (vue-ts-mode--treesit-language-at-point (treesit-node-start contents))))
-        (list :lang lang
-              :root (and (treesit-ready-p lang)
-                         (treesit-node-at (treesit-node-start contents) lang))))
-    (list :lang 'vue
-          :root el)))
-
 (defun vue-ts-mode--get-sfc-element-start-tags (root)
-  ""
+  "Return a list of the component's top level element treesit-nodes.
+
+ROOT is the root component node."
   (let ((sfc-elements (treesit-query-capture
                        root
                        `((start_tag
@@ -210,6 +219,7 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
              collect node)))
 
 (defun vue-ts-mode-imenu-index ()
+  "Create an imenu index for `vue-ts-mode'."
   (let* ((root (treesit-buffer-root-node 'vue))
          (sfc-elements (vue-ts-mode--get-sfc-element-start-tags root))
          (typescript-items (vue-ts-mode--sfc-element-imenu-index
@@ -231,6 +241,9 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
            (cons "TypeScript" typescript-items))))))
 
 (defmacro vue-ts-mode--define-lang-attr-predicate (lang)
+  "Define a predicate function which matches the LANG attr of a node.
+
+This will probably go away."
   (let ((lang (if (symbolp lang)
                   (symbol-name lang)
                 lang))
@@ -249,6 +262,7 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
 (vue-ts-mode--define-lang-attr-predicate "js")
 
 (defun vue-ts-mode--script-no-lang-p (raw-text-node)
+  "Return t if RAW-TEXT-NODE's parent tag has no lang attribute."
   (null
     (treesit-query-capture
      (treesit-node-parent raw-text-node)
@@ -257,10 +271,14 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
         (:equal "lang" @attr))))))
 
 (defun vue-ts-mode--js-tag-p (raw-text-node)
+  "Return t if RAW-TEXT-NODE's parent is a normal JS script tag."
   (or (vue-ts-mode--script-no-lang-p raw-text-node)
       (vue-ts-mode--start-tag-lang-js-p raw-text-node)))
 
 (defun vue-ts-mode--point-in-range-p (point range)
+  "Return t if POINT is within RANGE.
+
+RANGE should be a cons cell of numbers: (start . end)."
   (when range
     (<= (car range) point (cdr range))))
 
@@ -270,8 +288,7 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
           (mapcar (lambda (p)
                     (cons (treesit-parser-language p) (treesit-parser-included-ranges p))) (treesit-parser-list)))
          (match (cl-find-if (lambda (pair)
-                              (let ((lang (car pair))
-                                    (ranges (cdr pair)))
+                              (let ((ranges (cdr pair)))
                                 (cl-some (lambda (range)
                                            (and range
                                                 (vue-ts-mode--point-in-range-p point range)))
@@ -402,18 +419,18 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil.")
 
 (defvar-local vue-ts-mode--interpolation-parsers nil)
 
-(defun vue-ts-mode--setup-interpolation-parsers (_beg _end)
-  (mapc #'treesit-parser-delete vue-ts-mode--interpolation-parsers)
-  (setq vue-ts-mode--interpolation-parsers nil)
-  (let ((ranges (treesit-query-range
-                 (treesit-buffer-root-node 'vue)
-                 '((directive_attribute
-                    (quoted_attribute_value
-                     (attribute_value) @attr_js))))))
-    (dolist (range ranges)
-      (let ((parser (treesit-parser-create 'javascript nil t)))
-        (treesit-parser-set-included-ranges parser (list range))
-        (push parser vue-ts-mode--interpolation-parsers)))))
+;; (defun vue-ts-mode--setup-interpolation-parsers (_beg _end)
+;;   (mapc #'treesit-parser-delete vue-ts-mode--interpolation-parsers)
+;;   (setq vue-ts-mode--interpolation-parsers nil)
+;;   (let ((ranges (treesit-query-range
+;;                  (treesit-buffer-root-node 'vue)
+;;                  '((directive_attribute
+;;                     (quoted_attribute_value
+;;                      (attribute_value) @attr_js))))))
+;;     (dolist (range ranges)
+;;       (let ((parser (treesit-parser-create 'javascript nil t)))
+;;         (treesit-parser-set-included-ranges parser (list range))
+;;         (push parser vue-ts-mode--interpolation-parsers)))))
 
 ;; https://github.com/Sorixelle/astro-ts-mode/blob/207e5da093aa8141b9dd2f5e98afd8952832b4b0/astro-ts-mode.el#L218
 (defun vue-ts-mode--advice-for-treesit-buffer-root-node (&optional lang)
@@ -570,7 +587,9 @@ For example: <tag>|</tag>, but not <tag> |</tag>."
        (eql pos (treesit-node-start end-tag))))
 
 (defun vue-ts-mode--element-match-goto-end-p (start-tag end-tag pos)
-  "Return t if point should move to the end tag of the element at POS."
+  "Return t if point should move to the end tag of the element at POS.
+
+START-TAG and END-TAG belong to the element in question."
   (and (not (vue-ts-mode--pos-directly-between-tags-p start-tag end-tag pos))
        (or (vue-ts-mode--treesit-node-contains-pos-p start-tag pos)
            (and (not (vue-ts-mode--treesit-node-contains-pos-p end-tag pos))
@@ -581,7 +600,9 @@ For example: <tag>|</tag>, but not <tag> |</tag>."
                       (eql current-line start-tag-end-line)))))))
 
 (defun vue-ts-mode--element-match-goto-start-p (start-tag end-tag pos)
-  "Return t if point should move to the start tag of the element at POS."
+  "Return t if point should move to the start tag of the element at POS.
+
+START-TAG and END-TAG belong to the element in question."
   (or (vue-ts-mode--treesit-node-contains-pos-p end-tag pos)
       (vue-ts-mode--pos-directly-between-tags-p start-tag end-tag pos)
       (let ((current-line (line-number-at-pos pos))
@@ -592,6 +613,7 @@ For example: <tag>|</tag>, but not <tag> |</tag>."
                  (eql current-line end-tag-end-line))))))
 
 (defun vue-ts-mode--get-all-elements ()
+  "Return a list of all element nodes in the buffer."
   (flatten-tree (treesit-induce-sparse-tree
                  (treesit-buffer-root-node 'vue)
                  (vue-ts-mode--treesit-node-type-p

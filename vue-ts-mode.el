@@ -454,28 +454,45 @@ takes a treesit-node as an argument and perform the same NODE-TYPE comparison"
       (string-match-p node-type (treesit-node-type node)))))
 
 (defun vue-ts-mode--treesit-find-child (node pred)
-  "Return the first child of NODE which satisfies PRED."
-  (car (treesit-filter-child node pred)))
+  "Return the first child of NODE which satisfies PRED.
+
+PRED may be a regexp used to match a child node's type or a function which
+receives each child node as its argument."
+  (car (treesit-filter-child node (if (stringp pred)
+                                      (vue-ts-mode--treesit-node-type-p pred)
+                                    pred))))
+
+(defun vue-ts-mode--treesit-sibling-until (node pred &optional backward)
+  "Return the first sibling of NODE which satisfies PRED.
+
+PRED may be a regexp used to match a sibling node's type or a function which
+receives each sibling node as an argument.
+
+If BACKWARD is non-nil, search siblings before NODE."
+  (when (stringp pred)
+    (setq pred (vue-ts-mode--treesit-node-type-p pred)))
+  (let (matched-sibling
+        (sibling-by (if backward
+                        #'treesit-node-prev-sibling
+                      #'treesit-node-next-sibling)))
+    (while-let ((sibling (and node (funcall sibling-by node t))))
+      (if (funcall pred sibling)
+          (progn
+            (setq matched-sibling sibling)
+            (setq node nil))
+        (setq node sibling)))
+    matched-sibling))
 
 (defun vue-ts-mode--treesit-previous-sibling-start-tag (node)
   "Return the nearest sibling of NODE which has type \"start_tag\"."
-  (let (start-tag)
-    (while-let ((prev (and node (treesit-node-prev-sibling node t))))
-      (if (vue-ts-mode--treesit-node-type-p "start_tag" prev)
-          (progn
-            (setq start-tag prev)
-            (setq node nil))
-        (setq node prev)))
-    start-tag))
+  (vue-ts-mode--treesit-sibling-until node "start_tag" t))
 
 (defun vue-ts-mode--close-tag ()
   "Close the nearest start tag when \"</\" is before point."
   (when (looking-back "</" (- (point) 2))
     (when-let* ((current-node (treesit-node-at (point)))
                 (start-tag (vue-ts-mode--treesit-previous-sibling-start-tag current-node))
-                (start-tag-name (car (treesit-filter-child
-                                      start-tag
-                                      (vue-ts-mode--treesit-node-type-p "tag_name"))))
+                (start-tag-name (vue-ts-mode--treesit-find-child start-tag "tag_name"))
                 (start-tag-end-pos (treesit-node-end start-tag)))
       (let ((before-close-tag (- (point) 2)))
         (insert (treesit-node-text start-tag-name t))
@@ -526,16 +543,10 @@ Target is a symbol whose value is one of start, end, or match."
     (goto-char pos))
 
   (when-let ((element (vue-ts-mode--element-at-pos pos)))
-    (if-let ((self-closing-tag (vue-ts-mode--treesit-find-child
-                                element
-                                (vue-ts-mode--treesit-node-type-p "self_closing_tag"))))
+    (if-let ((self-closing-tag (vue-ts-mode--treesit-find-child element "self_closing_tag")))
         (goto-char (treesit-node-start self-closing-tag))
-      (when-let ((start-tag (vue-ts-mode--treesit-find-child
-                             element
-                             (vue-ts-mode--treesit-node-type-p "start_tag")))
-                 (end-tag (vue-ts-mode--treesit-find-child
-                           element
-                           (vue-ts-mode--treesit-node-type-p "end_tag"))))
+      (when-let ((start-tag (vue-ts-mode--treesit-find-child element "start_tag"))
+                 (end-tag (vue-ts-mode--treesit-find-child element "end_tag")))
         (cl-ecase target
           (end (goto-char (treesit-node-start end-tag)))
           (start (goto-char (treesit-node-start start-tag)))
@@ -570,8 +581,7 @@ For example: <tag>|</tag>, but not <tag> |</tag>."
                       (eql current-line start-tag-end-line)))))))
 
 (defun vue-ts-mode--element-match-goto-start-p (start-tag end-tag pos)
-  "Return t if point should move to the end tag of the element at POS."
-  (print (list pos (treesit-node-end start-tag) (treesit-node-start end-tag)))
+  "Return t if point should move to the start tag of the element at POS."
   (or (vue-ts-mode--treesit-node-contains-pos-p end-tag pos)
       (vue-ts-mode--pos-directly-between-tags-p start-tag end-tag pos)
       (let ((current-line (line-number-at-pos pos))

@@ -130,7 +130,9 @@ major modes."
     :language 'vue
     :feature 'html
     `(((tag_name) @vue-ts-mode-html-tag-face)
+
       (quoted_attribute_value "\"" @vue-ts-mode-attribute-value-face)
+
       ((attribute
         (attribute_name) @vue-ts-mode-attribute-face
         ("=") :? @vue-ts-mode-attribute-face
@@ -144,7 +146,9 @@ major modes."
        "]" @font-lock-bracket-face)
       (directive_attribute
        "=" @font-lock-keyword-face)
+
       ["<" ">" "</" "/>"] @font-lock-bracket-face
+
       (interpolation
        ["{{" "}}"] @font-lock-bracket-face ))
 
@@ -153,6 +157,7 @@ major modes."
     :override t
     `(((tag_name) @vue-ts-mode-builtin-tag-face
        (:match ,(regexp-opt vue-ts-mode-builtin-tags) @vue-ts-mode-builtin-tag-face))
+
       ((directive_name) @vue-ts-mode-shorthand-prefix-face
        (:match "^\\(#\\|@\\|:\\)" @vue-ts-mode-shorthand-prefix-face)))
 
@@ -170,12 +175,15 @@ major modes."
         (directive_name) @vue-ts-mode-builtin-directive-face
         (:match ,(regexp-opt vue-ts-mode-builtin-directives)
                 @vue-ts-mode-builtin-directive-face)))))
+
    (vue-ts-mode--prefix-sub-language-feature
     'typescript
     (typescript-ts-mode--font-lock-settings 'typescript))
+
    ;; (vue-ts-mode--prefix-sub-language-feature
    ;;  'javascript
    ;;  js--treesit-font-lock-settings)
+
    (vue-ts-mode--prefix-sub-language-feature
     'css
     css--treesit-settings))
@@ -250,13 +258,13 @@ This will probably go away."
         (fun-sym (intern (concat "vue-ts-mode--start-tag-lang-" lang "-p"))))
     `(defun ,fun-sym (raw-text-node)
        (treesit-query-capture
-         (treesit-node-parent raw-text-node)
-         '((attribute
-            (attribute_name) @attr
-            (quoted_attribute_value
-             (attribute_value) @lang)
-            (:equal "lang" @attr)
-            (:equal ,lang @lang)))))))
+        (treesit-node-parent raw-text-node)
+        '((attribute
+           (attribute_name) @attr
+           (quoted_attribute_value
+            (attribute_value) @lang)
+           (:equal "lang" @attr)
+           (:equal ,lang @lang)))))))
 
 (vue-ts-mode--define-lang-attr-predicate "ts")
 (vue-ts-mode--define-lang-attr-predicate "js")
@@ -264,11 +272,11 @@ This will probably go away."
 (defun vue-ts-mode--script-no-lang-p (raw-text-node)
   "Return t if RAW-TEXT-NODE's parent tag has no lang attribute."
   (null
-    (treesit-query-capture
-     (treesit-node-parent raw-text-node)
-     '((attribute
-        (attribute_name) @attr
-        (:equal "lang" @attr))))))
+   (treesit-query-capture
+    (treesit-node-parent raw-text-node)
+    '((attribute
+       (attribute_name) @attr
+       (:equal "lang" @attr))))))
 
 (defun vue-ts-mode--js-tag-p (raw-text-node)
   "Return t if RAW-TEXT-NODE's parent is a normal JS script tag."
@@ -441,7 +449,7 @@ If LANG is omitted, return ranges for the first language in the parser list.
 If `major-mode' is currently `vue-ts-mode', or if LANG is vue, this function
 instead always returns t."
   (if (or (eq lang 'vue) (not (eq major-mode 'vue-ts-mode)))
-    t
+      t
     (treesit-parser-included-ranges
      (treesit-parser-create
       (or lang (treesit-parser-language (car (treesit-parser-list))))))))
@@ -623,10 +631,10 @@ START-TAG and END-TAG belong to the element in question."
   "Move point to the beginning of the nearest HTML element after POS."
   (interactive "d")
   (when-let* ((elements (vue-ts-mode--get-all-elements))
-               (next-element (cl-find-if (lambda (n)
-                                           (and n (< pos (treesit-node-start n))))
-                                         elements)))
-     (goto-char (treesit-node-start next-element))))
+              (next-element (cl-find-if (lambda (n)
+                                          (and n (< pos (treesit-node-start n))))
+                                        elements)))
+    (goto-char (treesit-node-start next-element))))
 
 (defun vue-ts-mode-element-previous (pos)
   "Move point to the beginning of the nearest HTML element at or before POS."

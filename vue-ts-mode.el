@@ -211,9 +211,9 @@ major modes."
     'typescript
     (typescript-ts-mode--font-lock-settings 'typescript))
 
-   ;; (vue-ts-mode--prefix-sub-language-feature
-   ;;  'javascript
-   ;;  js--treesit-font-lock-settings)
+   (vue-ts-mode--prefix-sub-language-feature
+    'javascript
+    js--treesit-font-lock-settings)
 
    (vue-ts-mode--prefix-sub-language-feature
     'css
@@ -390,7 +390,7 @@ RANGE should be a cons cell of numbers: (start . end)."
                  vue-javascript-assignment
                  vue-javascript-constant
                  vue-javascript-escape-sequence
-                 vue-javascript-jsx
+                 ;; vue-javascript-jsx
                  vue-javascript-number
                  vue-javascript-pattern
                  vue-javascript-string-interpolation
@@ -433,10 +433,10 @@ RANGE should be a cons cell of numbers: (start . end)."
   (setq treesit-range-settings
         (treesit-range-rules
          ;; #'vue-ts-mode--setup-interpolation-parsers
-         :embed 'javascript
-         :host 'vue
-         '((interpolation
-            (raw_text) @capture))
+         ;; :embed 'javascript
+         ;; :host 'vue
+         ;; '((interpolation
+         ;;    (raw_text) @capture))
 
          :embed 'javascript
          :host 'vue

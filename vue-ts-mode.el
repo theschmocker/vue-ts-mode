@@ -226,6 +226,10 @@ that works for the specific nested language."
                   index))))
           simple-imenu-settings))
 
+(defun vue-ts-mode--element-top-level-p (element-node)
+  "Return t if ELEMENT-NODE is a child of the top-level component node."
+  (vue-ts-mode--treesit-node-type-p "component" (treesit-node-parent element-node)))
+
 (defun vue-ts-mode--get-sfc-element-start-tags (root)
   "Return a list of the component's top level element treesit-nodes.
 
@@ -238,7 +242,8 @@ ROOT is the root component node."
                        nil
                        nil)))
     (cl-loop for (cap . node) in sfc-elements
-             if (eq cap 'start-tag)
+             if (and (eq cap 'start-tag)
+                     (vue-ts-mode--element-top-level-p (treesit-node-parent node)))
              collect node)))
 
 (defun vue-ts-mode-imenu-index ()

@@ -63,6 +63,8 @@ arguments to the matcher function."
   `((vue
      (vue-ts-mode--comment-end-matcher parent-bol 0)
      ((parent-is "component") column-0 0)
+     ((parent-is "script_element") column-0 0)
+     ((parent-is "style_element") column-0 0)
      ((node-is "element") parent-bol vue-ts-mode-indent-offset)
      ((node-is "start_tag") parent-bol 0)
      ((node-is "end_tag") parent-bol 0)
@@ -78,6 +80,20 @@ arguments to the matcher function."
      ((parent-is "attribute_value") parent-bol 0)
      ((node-is "interpolation") parent-bol vue-ts-mode-indent-offset)
      ((parent-is "comment") parent-bol vue-ts-mode-indent-offset))))
+
+(defun vue-ts-mode--replace-indent-rules-offset (indent-rules &optional from-symbol to-symbol)
+  "Replace FROM-SYMBOL with TO-SYMBOL in INDENT-RULES list.
+
+Intended for use in overriding mode-specific indent offset variables in indent
+rules for nested languages."
+  (cl-labels ((replace-in-tree (node)
+                (cl-typecase node
+                  (list (mapcar #'replace-in-tree node))
+                  (symbol (if (eq node from-symbol)
+                              to-symbol
+                            node))
+                  (t node))))
+    (replace-in-tree indent-rules)))
 
 (defface vue-ts-mode-html-tag-face
   '((t . (:inherit font-lock-function-name-face)))
@@ -402,13 +418,17 @@ RANGE should be a cons cell of numbers: (start . end)."
   (when indent-tabs-mode
     (setq-local vue-ts-mode-indent-offset tab-width))
 
-  (setq-local typescript-ts-mode-indent-offset vue-ts-mode-indent-offset)
-
   (setq-local treesit-simple-indent-rules
               (append
                vue-ts-mode--indent-rules
-               (typescript-ts-mode--indent-rules 'typescript)
-               css--treesit-indent-rules))
+               (vue-ts-mode--replace-indent-rules-offset
+                (typescript-ts-mode--indent-rules 'typescript)
+                'typescript-ts-mode-indent-offset
+                'vue-ts-mode-indent-offset)
+               (vue-ts-mode--replace-indent-rules-offset
+                css--treesit-indent-rules
+                'css-indent-offset
+                'vue-ts-mode-indent-offset)))
 
   (setq treesit-range-settings
         (treesit-range-rules

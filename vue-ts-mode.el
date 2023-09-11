@@ -246,6 +246,14 @@ ROOT is the root component node."
                      (vue-ts-mode--element-top-level-p (treesit-node-parent node)))
              collect node)))
 
+(defun vue-ts-mode--imenu-tag-entries ()
+  "Return a list of imenu entries for HTML tags."
+  (cl-loop for el in (vue-ts-mode--get-all-elements)
+           if (not (vue-ts-mode--element-top-level-p el))
+           collect (let ((tag (vue-ts-mode--treesit-find-child el (regexp-opt '("start_tag" "self_closing_tag")))))
+                     (cons (treesit-node-text tag)
+                           (treesit-node-start el)))))
+
 (defun vue-ts-mode-imenu-index ()
   "Create an imenu index for `vue-ts-mode'."
   (let* ((root (treesit-buffer-root-node 'vue))
@@ -266,7 +274,8 @@ ROOT is the root component node."
                         sfc-elements))
       ,@(when typescript-items
           (list
-           (cons "TypeScript" typescript-items))))))
+           (cons "TypeScript" typescript-items)))
+      ("Tags" . ,(vue-ts-mode--imenu-tag-entries)))))
 
 (defmacro vue-ts-mode--define-lang-attr-predicate (lang)
   "Define a predicate function which matches the LANG attr of a node.

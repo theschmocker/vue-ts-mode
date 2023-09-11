@@ -268,14 +268,14 @@ ROOT is the root component node."
                                             eos)
                                nil nil))
                             #'js--treesit-defun-name)))
-    `(("SFC" . ,(mapcar (lambda (node)
-                          (cons (treesit-node-text node)
-                                (treesit-node-start node)))
-                        sfc-elements))
-      ,@(when typescript-items
-          (list
-           (cons "TypeScript" typescript-items)))
-      ("Tags" . ,(vue-ts-mode--imenu-tag-entries)))))
+    (cl-remove-if-not
+     #'cdr
+     `(("SFC" . ,(mapcar (lambda (node)
+                           (cons (treesit-node-text node)
+                                 (treesit-node-start node)))
+                         sfc-elements))
+       ("TypeScript" . ,typescript-items)
+       ("Tags" . ,(vue-ts-mode--imenu-tag-entries))))))
 
 (defmacro vue-ts-mode--define-lang-attr-predicate (lang)
   "Define a predicate function which matches the LANG attr of a node.

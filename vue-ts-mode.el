@@ -440,38 +440,61 @@ RANGE should be a cons cell of numbers: (start . end)."
 
          :embed 'javascript
          :host 'vue
-         `(;; (directive_attribute
-           ;;  (quoted_attribute_value
-           ;;   (attribute_value) @capture))
-           (script_element
-            (raw_text) @capture
-            (:pred vue-ts-mode--script-no-lang-p @capture)))
-         ;; '((directive_attribute
-         ;;    (quoted_attribute_value
-         ;;     (attribute_value) @attr_js)))
-
-         ;; :embed 'javascript
-         ;; :host 'vue
-         ;; `(((script_element
-         ;;     (raw_text) @javascript
-         ;;     (:pred vue-ts-mode--js-tag-p @javascript))))
+         `(((script_element (raw_text) @capture) @_script
+            (:pred vue-ts-mode--js-script-element-p @_script)))
 
          :embed 'typescript
          :host 'vue
-         '((script_element
-            (raw_text) @typescript
-            (:pred vue-ts-mode--start-tag-lang-ts-p @typescript)))
+         '(((script_element (raw_text) @capture) @_script
+            (:pred vue-ts-mode--ts-script-element-p @_script)))
 
          :embed 'css
          :host 'vue
-         '((style_element (raw_text) @css))))
+         '(((style_element (raw_text) @css) @_style-element
+            ;; TODO: uncomment this when adding other CSS lang support
+            ;; (:pred vue-ts-mode--css-style-element-p @_style-element)
+            ))))
 
   (modify-syntax-entry ?=  "." vue-ts-mode-syntax-table)
+  (modify-syntax-entry ?>  "." vue-ts-mode-syntax-table)
   (setq-local imenu-create-index-function #'vue-ts-mode-imenu-index)
 
   (add-hook 'post-command-hook #'vue-ts-mode--auto-close-tag-post-command-h nil t)
 
   (treesit-major-mode-setup))
+
+(defun vue-ts-mode--tag-attr-p (tag-node attr &optional value)
+  "Return t if TAG-NODE "
+  (let* ((attrs (treesit-filter-child tag-node (vue-ts-mode--treesit-node-type-p "attribute"))))
+    (and attrs
+         (cl-some (lambda (attr-node)
+                    (and (equal attr (treesit-node-text (vue-ts-mode--treesit-find-child attr-node "attribute_name")))
+                         (or (not value)
+                             (equal value (treesit-node-text (vue-ts-mode--treesit-find-child (vue-ts-mode--treesit-find-child attr-node "quoted_attribute_value")
+                                                                                              "attribute_value"))))))
+                  attrs))))
+
+(defun vue-ts-mode--js-script-element-p (script-element)
+  "Return t if SCRIPT-ELEMENT is a JavaScript language block."
+  (let ((start-tag (vue-ts-mode--treesit-find-child script-element "start_tag")))
+    (or (not (vue-ts-mode--tag-attr-p start-tag "lang"))
+        (vue-ts-mode--tag-attr-p start-tag "lang" "js"))))
+
+(defun vue-ts-mode--ts-script-element-p (script-element)
+  "Return t if SCRIPT-ELEMENT is a TypeScript language block."
+  (let ((start-tag (vue-ts-mode--treesit-find-child script-element "start_tag")))
+    (vue-ts-mode--tag-attr-p start-tag "lang" "ts")))
+
+(defun vue-ts-mode--css-style-element-p (style-element)
+  "Return t if STYLE-ELEMENT is a CSS language block."
+  (let ((start-tag (vue-ts-mode--treesit-find-child style-element "start_tag")))
+    (or (not (vue-ts-mode--tag-attr-p start-tag "lang"))
+        (vue-ts-mode--tag-attr-p start-tag "lang" "css"))))
+
+(defun vue-ts-mode--scss-style-element-p (style-element)
+  "Return t if STYLE-ELEMENT is an SCSS language block."
+  (let ((start-tag (vue-ts-mode--treesit-find-child style-element "start_tag")))
+    (vue-ts-mode--tag-attr-p start-tag "lang" "scss")))
 
 (defvar-local vue-ts-mode--interpolation-parsers nil)
 

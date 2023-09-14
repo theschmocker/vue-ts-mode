@@ -498,14 +498,21 @@ RANGE should be a cons cell of numbers: (start . end)."
 
 (defvar-local vue-ts-mode--interpolation-parsers nil)
 
+;; This is a start. Part of the problem is that when `treesit-font-lock-fontify-region'
+;; fontifies for a rule, it only grabs the root node of the rule's language.
+;; I need it to do fontification for ALL javascript parsers. I might be able to
+;; use add-function to advise it buffer-locally to get all js nodes
+
 ;; (defun vue-ts-mode--setup-interpolation-parsers (_beg _end)
 ;;   (mapc #'treesit-parser-delete vue-ts-mode--interpolation-parsers)
 ;;   (setq vue-ts-mode--interpolation-parsers nil)
 ;;   (let ((ranges (treesit-query-range
 ;;                  (treesit-buffer-root-node 'vue)
-;;                  '((directive_attribute
-;;                     (quoted_attribute_value
-;;                      (attribute_value) @attr_js))))))
+;;                  '((interpolation
+;;                     (raw_text) @capture)
+;;                    ((directive_attribute
+;;                      (quoted_attribute_value
+;;                       (attribute_value) @attr_js)))))))
 ;;     (dolist (range ranges)
 ;;       (let ((parser (treesit-parser-create 'javascript nil t)))
 ;;         (treesit-parser-set-included-ranges parser (list range))

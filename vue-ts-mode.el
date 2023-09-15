@@ -59,7 +59,7 @@ arguments to the matcher function."
          (goto-char bol)
          (looking-at "-->" t))))
 
-(defvar vue-ts-mode--indent-rules
+(defvar vue-ts-mode-indent-rules
   `((vue
      (vue-ts-mode--comment-end-matcher parent-bol 0)
      ((parent-is "component") column-0 0)
@@ -79,7 +79,8 @@ arguments to the matcher function."
      ((parent-is "quoted_attribute_value") parent-bol 0)
      ((parent-is "attribute_value") parent-bol 0)
      ((node-is "interpolation") parent-bol vue-ts-mode-indent-offset)
-     ((parent-is "comment") parent-bol vue-ts-mode-indent-offset))))
+     ((parent-is "comment") parent-bol vue-ts-mode-indent-offset)))
+  "Base tree-sitter indent rules for Vue templates.")
 
 (defun vue-ts-mode--replace-indent-rules-offset (indent-rules &optional from-symbol to-symbol)
   "Replace FROM-SYMBOL with TO-SYMBOL in INDENT-RULES list.
@@ -94,6 +95,27 @@ rules for nested languages."
                             node))
                   (t node))))
     (replace-in-tree indent-rules)))
+
+(defvar vue-ts-mode-javascript-indent-rules
+  (vue-ts-mode--replace-indent-rules-offset
+   js--treesit-indent-rules
+   'js-indent-level
+   'vue-ts-mode-indent-offset)
+  "Tree-sitter indent rules for embedded JavaScript.")
+
+(defvar vue-ts-mode-typescript-indent-rules
+  (vue-ts-mode--replace-indent-rules-offset
+   (typescript-ts-mode--indent-rules 'typescript)
+   'typescript-ts-mode-indent-offset
+   'vue-ts-mode-indent-offset)
+  "Tree-sitter indent rules for embedded TypeScript.")
+
+(defvar vue-ts-mode-css-indent-rules
+  (vue-ts-mode--replace-indent-rules-offset
+   css--treesit-indent-rules
+   'css-indent-offset
+   'vue-ts-mode-indent-offset)
+  "Tree-sitter indent rules for embedded CSS.")
 
 (defface vue-ts-mode-html-tag-face
   '((t . (:inherit font-lock-function-name-face)))
@@ -153,72 +175,83 @@ major modes."
              do (setf (nth 2 rule-copy) (intern (concat prefix (symbol-name (nth 2 rule)))))
              collect rule-copy)))
 
-(defvar vue-ts-mode--font-lock-settings
-  (append
-   (treesit-font-lock-rules
-    :language 'vue
-    :feature 'vue-template
-    `(((tag_name) @vue-ts-mode-html-tag-face)
+(defvar vue-ts-mode-font-lock-settings
+  (list
+   :language 'vue
+   :feature 'vue-template
+   `(((tag_name) @vue-ts-mode-html-tag-face)
 
-      (quoted_attribute_value "\"" @vue-ts-mode-attribute-value-face)
+     (quoted_attribute_value "\"" @vue-ts-mode-attribute-value-face)
 
-      ((attribute
-        (attribute_name) @vue-ts-mode-attribute-face
-        ("=") :? @vue-ts-mode-attribute-face
-        (quoted_attribute_value
-         (attribute_value) @vue-ts-mode-attribute-value-face) :?))
-      (directive_name) @vue-ts-mode-attribute-face
-      (directive_argument) @vue-ts-mode-attribute-face
-      (directive_dynamic_argument
-       "[" @font-lock-bracket-face
-       (directive_dynamic_argument_value) @vue-ts-mode-dynamic-directive-argument-face
-       "]" @font-lock-bracket-face)
-      (directive_attribute
-       "=" @font-lock-keyword-face)
+     ((attribute
+       (attribute_name) @vue-ts-mode-attribute-face
+       ("=") :? @vue-ts-mode-attribute-face
+       (quoted_attribute_value
+        (attribute_value) @vue-ts-mode-attribute-value-face) :?))
+     (directive_name) @vue-ts-mode-attribute-face
+     (directive_argument) @vue-ts-mode-attribute-face
+     (directive_dynamic_argument
+      "[" @font-lock-bracket-face
+      (directive_dynamic_argument_value) @vue-ts-mode-dynamic-directive-argument-face
+      "]" @font-lock-bracket-face)
+     (directive_attribute
+      "=" @font-lock-keyword-face)
 
-      ["<" ">" "</" "/>"] @font-lock-bracket-face
+     ["<" ">" "</" "/>"] @font-lock-bracket-face
 
-      (interpolation
-       ["{{" "}}"] @font-lock-bracket-face )
+     (interpolation
+      ["{{" "}}"] @font-lock-bracket-face )
 
-      (comment) @font-lock-comment-face)
+     (comment) @font-lock-comment-face)
 
-    :language 'vue
-    :feature 'vue-template
-    :override t
-    `(((tag_name) @vue-ts-mode-builtin-tag-face
-       (:match ,(regexp-opt vue-ts-mode-builtin-tags) @vue-ts-mode-builtin-tag-face))
+   :language 'vue
+   :feature 'vue-template
+   :override t
+   `(((tag_name) @vue-ts-mode-builtin-tag-face
+      (:match ,(regexp-opt vue-ts-mode-builtin-tags) @vue-ts-mode-builtin-tag-face))
 
-      ((directive_name) @vue-ts-mode-shorthand-prefix-face
-       (:match "^\\(#\\|@\\|:\\)" @vue-ts-mode-shorthand-prefix-face)))
+     ((directive_name) @vue-ts-mode-shorthand-prefix-face
+      (:match "^\\(#\\|@\\|:\\)" @vue-ts-mode-shorthand-prefix-face)))
 
-    :language 'vue
-    :feature 'vue-template
-    :override t
-    `(((component
-        :anchor
+   :language 'vue
+   :feature 'vue-template
+   :override t
+   `(((component
+       :anchor
+       (_
         (_
-         (_
-          (tag_name) @vue-ts-mode-sfc-tag-face
-          (:match ,(regexp-opt vue-ts-mode-sfc-tags) @vue-ts-mode-sfc-tag-face))) :*))
+         (tag_name) @vue-ts-mode-sfc-tag-face
+         (:match ,(regexp-opt vue-ts-mode-sfc-tags) @vue-ts-mode-sfc-tag-face))) :*))
 
-      ((directive_attribute
-        (directive_name) @vue-ts-mode-builtin-directive-face
-        (:match ,(regexp-opt vue-ts-mode-builtin-directives)
-                @vue-ts-mode-builtin-directive-face)))))
+     ((directive_attribute
+       (directive_name) @vue-ts-mode-builtin-directive-face
+       (:match ,(regexp-opt vue-ts-mode-builtin-directives)
+               @vue-ts-mode-builtin-directive-face)))))
+  "Base `treesit-font-lock-settings' for Vue templates in `vue-ts-mode'.")
 
-   (vue-ts-mode--prefix-sub-language-feature
-    'typescript
-    (typescript-ts-mode--font-lock-settings 'typescript))
+(defvar vue-ts-mode-javascript-font-lock-settings
+  (vue-ts-mode--prefix-sub-language-feature
+   'javascript
+   js--treesit-font-lock-settings)
+  "JavaScript `treesit-font-lock-settings' for `vue-ts-mode'.
 
-   (vue-ts-mode--prefix-sub-language-feature
-    'javascript
-    js--treesit-font-lock-settings)
+Adapted from `js-ts-mode'.")
 
-   (vue-ts-mode--prefix-sub-language-feature
-    'css
-    css--treesit-settings))
-  "`treesit-font-lock-settings' for `vue-ts-mode'.")
+(defvar vue-ts-mode-typescript-font-lock-settings
+  (vue-ts-mode--prefix-sub-language-feature
+   'typescript
+   (typescript-ts-mode--font-lock-settings 'typescript))
+  "TypeScript `treesit-font-lock-settings' for `vue-ts-mode'.
+
+Adapted from `typescript-ts-mode'")
+
+(defvar vue-ts-mode-css-font-lock-settings
+  (vue-ts-mode--prefix-sub-language-feature
+   'css
+   css--treesit-settings)
+  "CSS `treesit-font-lock-settings' for `vue-ts-mode'.
+
+Adapted from `css-ts-mode'")
 
 (defun vue-ts-mode--sfc-element-imenu-index (root simple-imenu-settings defun-name-function)
   "Create an imenu index for nested language tags.
@@ -325,6 +358,75 @@ RANGE should be a cons cell of numbers: (start . end)."
         (car match)
       'vue)))
 
+(defvar vue-ts-mode--javascript-range-rules
+  '(:embed javascript
+    :host vue
+    (((script_element (raw_text) @capture) @_script
+      (:pred vue-ts-mode--js-script-element-p @_script)))))
+
+(defvar vue-ts-mode--typescript-range-rules
+  '(:embed typescript
+    :host vue
+    (((script_element (raw_text) @capture) @_script
+      (:pred vue-ts-mode--ts-script-element-p @_script)))))
+
+(defvar vue-ts-mode--css-range-rules
+  '(:embed css
+    :host vue
+    (((style_element (raw_text) @css) @_style-element
+      ;; TODO: uncomment this when adding other CSS lang support
+      ;; (:pred vue-ts-mode--css-style-element-p @_style-element)
+      ))))
+
+(defvar vue-ts-mode-font-lock-feature-list
+  '((vue-template
+     vue-typescript-comment
+     vue-typescript-declaration
+     vue-javascript-comment
+     vue-javascript-definition
+                  vue-css-selector
+     vue-css-comment
+     vue-css-query
+     vue-css-keyword)
+
+    (vue-typescript-keyword
+     vue-typescript-string
+     vue-typescript-escape-sequence
+     vue-javascript-keyword
+     vue-javascript-string
+     vue-css-property
+     vue-css-constant
+     vue-css-string)
+
+    (vue-typescript-constant
+     vue-typescript-expression
+     vue-typescript-identifier
+     vue-typescript-number
+     vue-typescript-pattern
+     vue-typescript-property
+     vue-javascript-assignment
+     vue-javascript-constant
+     vue-javascript-escape-sequence
+     ;; vue-javascript-jsx
+     vue-javascript-number
+     vue-javascript-pattern
+     vue-javascript-string-interpolation
+     vue-css-error
+     vue-css-variable
+     vue-css-function
+     vue-css-operator
+     vue-css-bracked)
+
+    (vue-typescript-function
+     vue-typescript-bracket
+     vue-typescript-delimiter
+     vue-javascript-bracket
+     vue-javascript-delimiter
+     vue-javascript-function
+     vue-javascript-operator
+     vue-javascript-property))
+  "Font lock features for Vue templates and embedded languages.")
+
 (define-derived-mode vue-ts-mode prog-mode "Vue"
   "Tree-sitter mode for Vue."
   (when (treesit-ready-p 'vue)
@@ -333,103 +435,52 @@ RANGE should be a cons cell of numbers: (start . end)."
   (setq-local electric-indent-chars
               (append "{}():;,<>/=" electric-indent-chars))
 
-  (setq-local treesit-font-lock-feature-list
-              '((vue-template
-                 vue-typescript-comment
-                 vue-typescript-declaration
-                 vue-javascript-comment
-                 vue-javascript-definition
-                 vue-css-selector
-                 vue-css-comment
-                 vue-css-query
-                 vue-css-keyword)
+  (setq-local treesit-font-lock-feature-list vue-ts-mode-font-lock-feature-list)
+  (setq-local treesit-font-lock-settings
+              (append
+               (apply #'treesit-font-lock-rules vue-ts-mode-font-lock-settings)
+               (when (treesit-ready-p 'javascript)
+                 vue-ts-mode-javascript-font-lock-settings)
+               (when (treesit-ready-p 'typescript)
+                 vue-ts-mode-typescript-font-lock-settings)
+               (when (treesit-ready-p 'css)
+                 vue-ts-mode-css-font-lock-settings)))
 
-                (vue-typescript-keyword
-                 vue-typescript-string
-                 vue-typescript-escape-sequence
-                 vue-javascript-keyword
-                 vue-javascript-string
-                 vue-css-property
-                 vue-css-constant
-                 vue-css-string)
+  (setq-local treesit-simple-indent-rules
+              (append
+               vue-ts-mode-indent-rules
+               (when (treesit-ready-p 'javascript)
+                 vue-ts-mode-javascript-indent-rules)
+               (when (treesit-ready-p 'typescript)
+                 vue-ts-mode-typescript-indent-rules)
+               (when (treesit-ready-p 'css)
+                 vue-ts-mode-css-indent-rules)))
 
-                (vue-typescript-constant
-                 vue-typescript-expression
-                 vue-typescript-identifier
-                 vue-typescript-number
-                 vue-typescript-pattern
-                 vue-typescript-property
-                 vue-javascript-assignment
-                 vue-javascript-constant
-                 vue-javascript-escape-sequence
-                 ;; vue-javascript-jsx
-                 vue-javascript-number
-                 vue-javascript-pattern
-                 vue-javascript-string-interpolation
-                 vue-css-error
-                 vue-css-variable
-                 vue-css-function
-                 vue-css-operator
-                 vue-css-bracked)
+  (setq treesit-range-settings
+        (apply #'treesit-range-rules
+               (append
+                (when (treesit-ready-p 'javascript)
+                  vue-ts-mode--javascript-range-rules)
+                (when (treesit-ready-p 'typescript)
+                  vue-ts-mode--typescript-range-rules)
+                (when (treesit-ready-p 'css)
+                  vue-ts-mode--css-range-rules))))
 
-                (vue-typescript-function
-                 vue-typescript-bracket
-                 vue-typescript-delimiter
-                 vue-javascript-bracket
-                 vue-javascript-delimiter
-                 vue-javascript-function
-                 vue-javascript-operator
-                 vue-javascript-property)))
+  ;; TODO: for experimental multi-parsers for interpolations and directive bindings
+  ;; #'vue-ts-mode--setup-interpolation-parsers
+  ;; :embed 'javascript
+  ;; :host 'vue
+  ;; '((interpolation
+  ;;    (raw_text) @capture))
 
+  (setq-local imenu-create-index-function #'vue-ts-mode-imenu-index)
 
   (setq-local treesit-language-at-point-function #'vue-ts-mode--treesit-language-at-point)
-
-  (setq-local treesit-font-lock-settings
-              vue-ts-mode--font-lock-settings)
 
   (when indent-tabs-mode
     (setq-local vue-ts-mode-indent-offset tab-width))
 
-  (setq-local treesit-simple-indent-rules
-              (append
-               vue-ts-mode--indent-rules
-               (vue-ts-mode--replace-indent-rules-offset
-                (typescript-ts-mode--indent-rules 'typescript)
-                'typescript-ts-mode-indent-offset
-                'vue-ts-mode-indent-offset)
-               (vue-ts-mode--replace-indent-rules-offset
-                css--treesit-indent-rules
-                'css-indent-offset
-                'vue-ts-mode-indent-offset)))
-
-  (setq treesit-range-settings
-        (treesit-range-rules
-         ;; #'vue-ts-mode--setup-interpolation-parsers
-         ;; :embed 'javascript
-         ;; :host 'vue
-         ;; '((interpolation
-         ;;    (raw_text) @capture))
-
-         :embed 'javascript
-         :host 'vue
-         `(((script_element (raw_text) @capture) @_script
-            (:pred vue-ts-mode--js-script-element-p @_script)))
-
-         :embed 'typescript
-         :host 'vue
-         '(((script_element (raw_text) @capture) @_script
-            (:pred vue-ts-mode--ts-script-element-p @_script)))
-
-         :embed 'css
-         :host 'vue
-         '(((style_element (raw_text) @css) @_style-element
-            ;; TODO: uncomment this when adding other CSS lang support
-            ;; (:pred vue-ts-mode--css-style-element-p @_style-element)
-            ))))
-
-
   (modify-syntax-entry ?>  "." vue-ts-mode-syntax-table)
-  (setq-local imenu-create-index-function #'vue-ts-mode-imenu-index)
 
   (add-hook 'post-command-hook #'vue-ts-mode--auto-close-tag-post-command-h nil t)
   (add-hook 'post-command-hook #'vue-ts-mode--language-at-point-post-command-h nil t)
@@ -439,6 +490,7 @@ RANGE should be a cons cell of numbers: (start . end)."
   (treesit-major-mode-setup)
 
   ;; HACK: language at point is always detected as vue the first time otherwise.
+  ;; TODO: seeing the same issue at bol after reindent as well
   (run-with-timer 0.0 nil #'vue-ts-mode--language-at-point-post-command-h))
 
 (defun vue-ts-mode--tag-attr-p (tag-node attr &optional value)

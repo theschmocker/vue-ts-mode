@@ -345,7 +345,8 @@ RANGE should be a cons cell of numbers: (start . end)."
   "Return the language at POINT."
   (let* ((parser-range-alist
           (mapcar (lambda (p)
-                    (cons (treesit-parser-language p) (treesit-parser-included-ranges p))) (treesit-parser-list)))
+                    (cons (treesit-parser-language p) (treesit-parser-included-ranges p)))
+                  (treesit-parser-list)))
          (match (cl-find-if (lambda (pair)
                               (let ((ranges (cdr pair)))
                                 (cl-some (lambda (range)
@@ -357,22 +358,49 @@ RANGE should be a cons cell of numbers: (start . end)."
         (car match)
       'vue)))
 
+(defun vue-ts-mode--get-sfc-element-ranges (query)
+  "Return a list of ranges between start/end tags of SFC elements matching QUERY.
+
+Ranges are pairs of (beg . end)."
+  (let ((element (treesit-query-capture
+                  (treesit-buffer-root-node 'vue)
+                  query)))
+    (cl-loop for (_ . el) in element
+             collect (let ((start-tag (vue-ts-mode--treesit-find-child el "start_tag"))
+                           (end-tag (vue-ts-mode--treesit-find-child el "end_tag")))
+                       (cons (treesit-node-end start-tag)
+                             (treesit-node-start end-tag))))))
+
+(defun vue-ts-mode--create-sfc-element-range-rule (lang query)
+  "Return a custom `treesit-range-rules' function rule for LANG with QUERY.
+
+The raw_text node exposed by the vue parser doesn't include anything between the
+start tag and the first non-whitespace char or the last non-whitespace character
+and the end tag, which caused issues detecing the language at point in embedded
+SFC language blocks.
+
+The rule created by this function includes the entire range between the start
+and end tags."
+  (declare (indent defun))
+  (list (lambda (_beg _end)
+          (treesit-parser-set-included-ranges
+           (treesit-parser-create lang)
+           (vue-ts-mode--get-sfc-element-ranges
+            query)))))
+
 (defvar vue-ts-mode--javascript-range-rules
-  '(:embed javascript
-    :host vue
-    (((script_element (raw_text) @capture) @_script
-      (:pred vue-ts-mode--js-script-element-p @_script)))))
+  (vue-ts-mode--create-sfc-element-range-rule 'javascript
+    '(((script_element) @script
+       (:pred vue-ts-mode--js-script-element-p @script)))))
 
 (defvar vue-ts-mode--typescript-range-rules
-  '(:embed typescript
-    :host vue
-    (((script_element (raw_text) @capture) @_script
-      (:pred vue-ts-mode--ts-script-element-p @_script)))))
+  (vue-ts-mode--create-sfc-element-range-rule 'typescript
+    '(((script_element) @script
+       (:pred vue-ts-mode--ts-script-element-p @script)))))
 
 (defvar vue-ts-mode--css-range-rules
-  '(:embed css
-    :host vue
-    (((style_element (raw_text) @css) @_style-element
+  (vue-ts-mode--create-sfc-element-range-rule 'css
+    '(((style_element) @style-element
       ;; TODO: uncomment this when adding other CSS lang support
       ;; (:pred vue-ts-mode--css-style-element-p @_style-element)
       ))))
@@ -489,7 +517,6 @@ RANGE should be a cons cell of numbers: (start . end)."
   (treesit-major-mode-setup)
 
   ;; HACK: language at point is always detected as vue the first time otherwise.
-  ;; TODO: seeing the same issue at bol after reindent as well
   (run-with-timer 0.0 nil #'vue-ts-mode--language-at-point-post-command-h))
 
 (defun vue-ts-mode--tag-attr-p (tag-node attr &optional value)

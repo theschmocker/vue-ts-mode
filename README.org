@@ -7,7 +7,10 @@ A work-in-progress tree-sitter-based Emacs major mode for Vue.
 Basic HTML, JS/TS, and CSS highlighting, plus additional highlighting for Vue-specific constructs like top-level SFC tags, built-in elements/components (template, transition, etc.), directives, etc.
 
 *** Indentation
-Basic indentation for templates. script/style indentation imported from there respective built-in tree-sitter modes. Needs refinement.
+Basic indentation for templates. script/style indentation imported from their respective built-in tree-sitter modes.
+
+*** Language specific comment syntax
+Automatically set comment variables for HTML in templates and JS/TS/CSS in their respective embedded language blocks.
 
 *** imenu
 Top level <template>, <script>, and <style> tags included in imenu, as well as the simple entries from typescript-ts-mode. Plans to add JS, CSS, and possibly more granular <template> entries
@@ -28,12 +31,15 @@ Note that, at time of writing, none of these are bound to any keymap.
 The current tree-sitter integration in Emacs treats all embedded language ranges as a single document of that language, combined. At best, font-locking /sometimes/ works. At worst, I've run into Emacs freezing completely. I'm experimenting with creating an individual parser per interpolation, but I've not had much success with it and I'm not sure what the performance will look like for larger components. If I can get it to function, I may put it behind a flag that's off by default
 
 *** <script> tag highlight
-Only targets =<script (setup)>= and =<script (setup) lang​="ts">=. Plan is to support =jsx=, =tsx=, and =js= lang attributes as well.
+No support for jsx/tsx
 
 Also: there's code in the current built-in js/ts tree-sitter font lock settings that breaks on new versions of the parsers. It's /supposed/ to handle the differences in parser versions, but it doesn't work correctly. I've got some advice in my personal config that fixes it, but I'm unsure as to whether or not I'll include that here.
 
 *** No special SCSS/Less highlighting
 Only plain CSS so far
+
+*** Comments
+The aforementioned language specific commenting is incomplete. Basic line/region commenting works, but auto fill / comment continuation doesn't. I need to familiarize myself more with how those work in Emacs.
 
 ** Alternatives
 *** https://web-mode.org/

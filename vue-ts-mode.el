@@ -427,16 +427,24 @@ RANGE should be a cons cell of numbers: (start . end)."
             ;; (:pred vue-ts-mode--css-style-element-p @_style-element)
             ))))
 
-  (modify-syntax-entry ?=  "." vue-ts-mode-syntax-table)
+
   (modify-syntax-entry ?>  "." vue-ts-mode-syntax-table)
   (setq-local imenu-create-index-function #'vue-ts-mode-imenu-index)
 
   (add-hook 'post-command-hook #'vue-ts-mode--auto-close-tag-post-command-h nil t)
+  (add-hook 'post-command-hook #'vue-ts-mode--language-at-point-post-command-h nil t)
 
-  (treesit-major-mode-setup))
+  (add-hook 'vue-ts-mode-language-at-point-functions #'vue-ts-mode--language-at-point-comment-vars-function)
+
+  (treesit-major-mode-setup)
+
+  ;; HACK: language at point is always detected as vue the first time otherwise.
+  (run-with-timer 0.0 nil #'vue-ts-mode--language-at-point-post-command-h))
 
 (defun vue-ts-mode--tag-attr-p (tag-node attr &optional value)
-  "Return t if TAG-NODE "
+  "Return t if TAG-NODE has attribute ATTR.
+
+If VALUE is non-nil, also check that the attribute has that value."
   (let* ((attrs (treesit-filter-child tag-node (vue-ts-mode--treesit-node-type-p "attribute"))))
     (and attrs
          (cl-some (lambda (attr-node)
@@ -467,6 +475,50 @@ RANGE should be a cons cell of numbers: (start . end)."
   "Return t if STYLE-ELEMENT is an SCSS language block."
   (let ((start-tag (vue-ts-mode--treesit-find-child style-element "start_tag")))
     (vue-ts-mode--tag-attr-p start-tag "lang" "scss")))
+
+(defvar-local vue-ts-mode--last-lang-at-point nil
+  "Last detected language at point.
+
+Supports `vue-ts-mode--language-at-point-post-command-h'.")
+
+(defvar vue-ts-mode-language-at-point-functions nil
+  "Functions run when the language at point changes.
+
+The function should take a single argument, which is a language name symbol.")
+
+(defun vue-ts-mode--language-at-point-post-command-h ()
+  "Call `vue-ts-mode-language-at-point-functions' when lang at point changes."
+  (let ((lang (vue-ts-mode--treesit-language-at-point (point))))
+    (when (not (eq lang vue-ts-mode--last-lang-at-point))
+      (setq vue-ts-mode--last-lang-at-point lang)
+      (run-hook-with-args 'vue-ts-mode-language-at-point-functions lang))))
+
+(defun vue-ts-mode--language-at-point-comment-vars-function (lang)
+  "Set various comment vars based on LANG.
+
+LANG is a symbol returned by `vue-ts-mode--treesit-language-at-point'."
+  (print lang)
+  (cl-case lang
+    (vue
+     (setq-local comment-start "<!-- ")
+     (setq-local comment-end " -->")
+     (setq-local comment-start-skip "<!--[ \t]*")
+     (setq-local comment-end-skip "[ \t]*--[ \t\n]*>"))
+    ((javascript typescript scss)
+     (setq-local comment-start "// ")
+     (setq-local comment-end "")
+     (setq-local comment-start-skip (rx (or (seq "/" (+ "/"))
+                                            (seq "/" (+ "*")))
+                                        (* (syntax whitespace))))
+     (setq-local comment-end-skip
+                 (rx (* (syntax whitespace))
+                     (group (or (syntax comment-end)
+                                (seq (+ "*") "/"))))))
+    (css
+     (setq-local comment-start "/*")
+     (setq-local comment-start-skip "/\\*+[ \t]*")
+     (setq-local comment-end "*/")
+     (setq-local comment-end-skip "[ \t]*\\*+/"))))
 
 (defvar-local vue-ts-mode--interpolation-parsers nil)
 

@@ -53,7 +53,6 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil."
 
 See `treesit-simple-indent-rules' for info about the NODE, PARENT, and BOL
 arguments to the matcher function."
-  (print (list node parent bol))
   (and (vue-ts-mode--treesit-node-type-p "comment" parent)
        (save-excursion
          (goto-char bol)
@@ -549,7 +548,6 @@ The function should take a single argument, which is a language name symbol.")
   "Set various comment vars based on LANG.
 
 LANG is a symbol returned by `vue-ts-mode--treesit-language-at-point'."
-  (print lang)
   (cl-case lang
     (vue
      (setq-local comment-start "<!-- ")

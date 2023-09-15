@@ -367,7 +367,8 @@ Ranges are pairs of (beg . end)."
                   query)))
     (cl-loop for (_ . el) in element
              collect (let ((start-tag (vue-ts-mode--treesit-find-child el "start_tag"))
-                           (end-tag (vue-ts-mode--treesit-find-child el "end_tag")))
+                           ;; treesit-filter-child doesn't include anything after start_tags ending > for who knows what reason
+                           (end-tag (cl-find-if (vue-ts-mode--treesit-node-type-p "end_tag") (treesit-node-children el))))
                        (cons (treesit-node-end start-tag)
                              (treesit-node-start end-tag))))))
 

@@ -293,27 +293,6 @@ ROOT is the root component node."
        ("TypeScript" . ,typescript-items)
        ("Tags" . ,(vue-ts-mode--imenu-tag-entries))))))
 
-(defmacro vue-ts-mode--define-lang-attr-predicate (lang)
-  "Define a predicate function which matches the LANG attr of a node.
-
-This will probably go away."
-  (let ((lang (if (symbolp lang)
-                  (symbol-name lang)
-                lang))
-        (fun-sym (intern (concat "vue-ts-mode--start-tag-lang-" lang "-p"))))
-    `(defun ,fun-sym (raw-text-node)
-       (treesit-query-capture
-        (treesit-node-parent raw-text-node)
-        '((attribute
-           (attribute_name) @attr
-           (quoted_attribute_value
-            (attribute_value) @lang)
-           (:equal "lang" @attr)
-           (:equal ,lang @lang)))))))
-
-(vue-ts-mode--define-lang-attr-predicate "ts")
-(vue-ts-mode--define-lang-attr-predicate "js")
-
 (defun vue-ts-mode--script-no-lang-p (raw-text-node)
   "Return t if RAW-TEXT-NODE's parent tag has no lang attribute."
   (null
@@ -322,11 +301,6 @@ This will probably go away."
     '((attribute
        (attribute_name) @attr
        (:equal "lang" @attr))))))
-
-(defun vue-ts-mode--js-tag-p (raw-text-node)
-  "Return t if RAW-TEXT-NODE's parent is a normal JS script tag."
-  (or (vue-ts-mode--script-no-lang-p raw-text-node)
-      (vue-ts-mode--start-tag-lang-js-p raw-text-node)))
 
 (defun vue-ts-mode--point-in-range-p (point range)
   "Return t if POINT is within RANGE.
@@ -350,8 +324,6 @@ RANGE should be a cons cell of numbers: (start . end)."
     (if match
         (car match)
       'vue)))
-
-(add-to-list 'auto-mode-alist '("\\.vue\\'" . vue-ts-mode))
 
 (define-derived-mode vue-ts-mode prog-mode "Vue"
   "Tree-sitter mode for Vue."

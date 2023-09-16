@@ -412,7 +412,7 @@ and end tags."
      vue-typescript-declaration
      vue-javascript-comment
      vue-javascript-definition
-                  vue-css-selector
+     vue-css-selector
      vue-css-comment
      vue-css-query
      vue-css-keyword)

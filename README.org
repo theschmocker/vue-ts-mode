@@ -17,7 +17,23 @@ Top level <template>, <script>, and <style> tags included in imenu, as well as t
 
 ** Extras
 *** Auto-close HTML tags
+Automatically close the nearest start tag after inserting =</=.
 Enabled by default. Disable it using the custom variable =vue-ts-mode-auto-close-tags=.
+*** Auto-open line between HTML tags
+Automatically insert an extra newline between an element's start and end tags.
+
+Starting from a state like this (where "|" is the cursor):
+#+begin_src html
+<div>|</div>
+#+end_src
+and pressing return (or otherwise running =newline-and-indent= as a command) will result in a state like this:
+#+begin_src html
+<div>
+  |
+</div>
+#+end_src
+
+Enabled by default. Disable it using the custom variable =vue-ts-mode-auto-open-tags=.
 *** Structural Navigation
 Note that, at time of writing, none of these are bound to any keymap.
 - =vue-ts-mode-element-match=: jump between the start/end tags of the element at point.

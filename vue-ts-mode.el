@@ -48,6 +48,11 @@ Will be overridden by `tab-width' When `indent-tabs-mode' is non-nil."
   :group 'vue-ts
   :type '(boolean))
 
+(defcustom vue-ts-mode-auto-open-tags t
+  "Automatically insert an extra newline between tags."
+  :group 'vue-ts
+  :type '(boolean))
+
 (defun vue-ts-mode--comment-end-matcher (node parent bol)
   "Match the closing \"-->\" on its own line in a comment node.
 
@@ -510,6 +515,7 @@ and end tags."
 
   (modify-syntax-entry ?>  "." vue-ts-mode-syntax-table)
 
+  (add-hook 'pre-command-hook #'vue-ts-mode--auto-open-tag-pre-command-h nil t)
   (add-hook 'post-command-hook #'vue-ts-mode--auto-close-tag-post-command-h nil t)
   (add-hook 'post-command-hook #'vue-ts-mode--language-at-point-post-command-h nil t)
 
@@ -713,6 +719,34 @@ If BACKWARD is non-nil, search siblings before NODE."
                    (list 'self-insert-command
                          (key-binding [remap self-insert-command]))))
     (vue-ts-mode--close-tag)))
+
+(defun vue-ts-mode--open-tag ()
+  "Insert an extra newline and indent when point is between open/close tags.
+
+When run before `newline-and-indent' in `pre-command-hook', it behaves like
+
+
+<div>|</div>
+
+becomes
+
+<div>
+  |
+</div>"
+  (when-let* ((element (vue-ts-mode--element-at-pos (point)))
+              (start-tag (vue-ts-mode--treesit-find-child element "start_tag"))
+              (end-tag (vue-ts-mode--treesit-find-child element "end_tag")))
+    (when (vue-ts-mode--pos-directly-between-tags-p start-tag end-tag (point))
+      (save-excursion
+        (newline-and-indent)))))
+
+(defun vue-ts-mode--auto-open-tag-pre-command-h ()
+  "Run `vue-ts-mode--open-tag' before `newline-and-indent' in `pre-command-hook'."
+  (when (and vue-ts-mode-auto-open-tags
+             (memq this-command
+                   (list 'newline-and-indent
+                         (key-binding [remap newline-and-indent]))))
+    (vue-ts-mode--open-tag)))
 
 ;;; Navigation
 

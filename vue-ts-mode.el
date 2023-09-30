@@ -346,6 +346,12 @@ RANGE should be a cons cell of numbers: (start . end)."
   (when range
     (<= (car range) point (cdr range))))
 
+(defun vue-ts-mode--point-in-node-p (point node)
+  "Return t if POINT is within treesit node NODE."
+  (vue-ts-mode--point-in-range-p point
+                                 (cons (treesit-node-start node)
+                                       (treesit-node-end node))))
+
 (defun vue-ts-mode--treesit-language-at-point (point)
   "Return the language at POINT."
   (let* ((parser-range-alist
@@ -906,6 +912,86 @@ previous sibling."
                         vue-ts-mode--element-node-type-regexp
                         backward)))
     (vue-ts-mode--swap-nodes element sibling)))
+
+(defun vue-ts-mode--attributes-wrapped-p (&optional pos)
+  (let ((pos (or pos (point))))
+    (let ((no-tag-error-message "No tag with attributes at point"))
+      (if-let* ((element (vue-ts-mode--element-at-pos pos))
+                (start_tag (vue-ts-mode--treesit-find-child element "start_tag\\|self_closing_tag"))
+                (_ (vue-ts-mode--point-in-node-p pos start_tag)))
+          (not
+           (eql (line-number-at-pos (treesit-node-start start_tag))
+                (line-number-at-pos (treesit-node-end start_tag))))
+        (error no-tag-error-message)))))
+
+(defun vue-ts-mode-attributes-wrap (&optional point)
+  "Put all attributes on their own line."
+  (interactive "d")
+  (let ((no-tag-error-message "No tag with attributes at point"))
+    (if-let* ((element (vue-ts-mode--element-at-pos point))
+              (start_tag (vue-ts-mode--treesit-find-child element "start_tag\\|self_closing_tag"))
+              (_ (vue-ts-mode--point-in-node-p point start_tag)))
+        (progn
+          (let ((attrs (treesit-filter-child start_tag (vue-ts-mode--treesit-node-type-p "attribute\\'"))))
+            (when (null attrs)
+              (error no-tag-error-message))
+            (let* ((children (treesit-node-children start_tag))
+                   (parts (mapcar (lambda (node)
+                                    (let* ((type (treesit-node-type node))
+                                           (add-newline-p (string-match-p "attribute\\|tag_name" type)))
+                                      (cons
+                                       (treesit-node-text node t)
+                                       add-newline-p)))
+                                  children))
+                   (start (treesit-node-start start_tag))
+                   (end (treesit-node-end start_tag)))
+              (atomic-change-group
+                (delete-region start end)
+                (goto-char start)
+                (cl-loop for (text . add-newline-p) in parts
+                         do (progn
+                              (insert text)
+                              (indent-according-to-mode)
+                              (when add-newline-p
+                                (newline-and-indent))))))))
+      (error no-tag-error-message))))
+
+(defun vue-ts-mode-attributes-unwrap (&optional point)
+  "Put all attributes on the same line."
+  (interactive "d")
+  (let ((no-tag-error-message "No tag with attributes at point"))
+    (if-let* ((element (vue-ts-mode--element-at-pos point))
+              (start_tag (vue-ts-mode--treesit-find-child element "start_tag\\|self_closing_tag"))
+              (_ (vue-ts-mode--point-in-node-p point start_tag)))
+        (progn
+          (let ((attrs (treesit-filter-child start_tag (vue-ts-mode--treesit-node-type-p "attribute\\'"))))
+            (when (null attrs)
+              (error no-tag-error-message))
+            (let* ((children (treesit-node-children start_tag))
+                   (parts (mapcar (lambda (node)
+                                    (let* ((type (treesit-node-type node))
+                                           (add-leading-space-p (string-match-p "attribute\\|/>" type))
+                                           (text (treesit-node-text node t)))
+                                      (if add-leading-space-p
+                                          (concat " " text)
+                                        text)))
+                                  children))
+                   (start (treesit-node-start start_tag))
+                   (end (treesit-node-end start_tag)))
+              (atomic-change-group
+                (delete-region start end)
+                (goto-char start)
+                (cl-loop for text in parts do (insert text))
+                (indent-according-to-mode)))))
+      (error no-tag-error-message))))
+
+(defun vue-ts-mode-attributes-toggle-wrap (&optional point)
+  "Toggle attribute wrapping of the element at POINT."
+  (interactive "d")
+  (call-interactively
+   (if (vue-ts-mode--attributes-wrapped-p point)
+       #'vue-ts-mode-attributes-unwrap
+     #'vue-ts-mode-attributes-wrap)))
 
 (provide 'vue-ts-mode)
 ;;; vue-ts-mode.el ends here

@@ -41,6 +41,7 @@ Note that, at time of writing, none of these are bound to any keymap.
 *** Structural Editing
 Note that, at time of writing, none of these are bound to any keymap.
 - =vue-ts-mode-element-transpose=: swap the element at point with its sibling. Swap with previous sibling if a prefix arg is provided.
+- =vue-ts-mode-attributes-toggle-wrap=, =vue-ts-mode-attributes-wrap=, and =vue-ts-mode-attributes-unwrap=: wrap puts all attributes on their own line ([[https://vuejs.org/style-guide/rules-strongly-recommended.html#multi-attribute-elements][as in the style guide]]), unwrap puts all attributes and tag brackets on the same line, and toggle toggles between the two.
 
 ** Known Issues
 *** JS/TS highlighting in interpolations/bindings

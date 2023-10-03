@@ -949,47 +949,32 @@ previous sibling."
 (defun vue-ts-mode-attributes-wrap (&optional point)
   "Put all attributes on their own line."
   (interactive "d")
-  (let ((no-tag-error-message "No tag with attributes at point"))
-    (if-let* ((element (vue-ts-mode--element-at-pos point))
-              (start_tag (vue-ts-mode--treesit-find-child element "start_tag\\|self_closing_tag"))
-              (_ (vue-ts-mode--point-in-node-p point start_tag)))
-        (progn
-          (let ((attrs (treesit-filter-child start_tag (vue-ts-mode--treesit-node-type-p "attribute\\'"))))
-            (when (null attrs)
-              (error no-tag-error-message))
-            (let* ((children (treesit-node-children start_tag))
-                   (parts (mapcar (lambda (node)
-                                    (let* ((type (treesit-node-type node))
-                                           (add-newline-p (string-match-p "attribute\\|tag_name" type)))
-                                      (cons
-                                       (treesit-node-text node t)
-                                       add-newline-p)))
-                                  children))
-                   (start (treesit-node-start start_tag))
-                   (end (treesit-node-end start_tag)))
-              (atomic-change-group
-                (delete-region start end)
-                (goto-char start)
-                (cl-loop for (text . add-newline-p) in parts
-                         do (progn
-                              (insert text)
-                              (indent-according-to-mode)
-                              (when add-newline-p
-                                (newline-and-indent))))))))
-      (error no-tag-error-message))))
+  (vue-ts-mode--with-attr-tag-at-pos point start_tag
+    (let* ((children (treesit-node-children start_tag))
+           (parts (mapcar (lambda (node)
+                            (let* ((type (treesit-node-type node))
+                                   (add-newline-p (string-match-p "attribute\\|tag_name" type)))
+                              (cons
+                               (treesit-node-text node t)
+                               add-newline-p)))
+                          children))
+           (start (treesit-node-start start_tag))
+           (end (treesit-node-end start_tag)))
+      (atomic-change-group
+        (delete-region start end)
+        (goto-char start)
+        (cl-loop for (text . add-newline-p) in parts
+                 do (progn
+                      (insert text)
+                      (indent-according-to-mode)
+                      (when add-newline-p
+                        (newline-and-indent))))))))
 
 (defun vue-ts-mode-attributes-unwrap (&optional point)
   "Put all attributes on the same line."
   (interactive "d")
-  (let ((no-tag-error-message "No tag with attributes at point"))
-    (if-let* ((element (vue-ts-mode--element-at-pos point))
-              (start_tag (vue-ts-mode--treesit-find-child element "start_tag\\|self_closing_tag"))
-              (_ (vue-ts-mode--point-in-node-p point start_tag)))
-        (progn
-          (let ((attrs (treesit-filter-child start_tag (vue-ts-mode--treesit-node-type-p "attribute\\'"))))
-            (when (null attrs)
-              (error no-tag-error-message))
-            (let* ((children (treesit-node-children start_tag))
+  (vue-ts-mode--with-attr-tag-at-pos point start_tag
+    (let* ((children (treesit-node-children start_tag))
                    (parts (mapcar (lambda (node)
                                     (let* ((type (treesit-node-type node))
                                            (add-leading-space-p (string-match-p "attribute\\|/>" type))
@@ -1005,7 +990,6 @@ previous sibling."
                 (goto-char start)
                 (cl-loop for text in parts do (insert text))
                 (indent-according-to-mode)))))
-      (error no-tag-error-message))))
 
 (defun vue-ts-mode-attributes-toggle-wrap (&optional point)
   "Toggle attribute wrapping of the element at POINT."

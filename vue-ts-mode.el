@@ -913,16 +913,38 @@ previous sibling."
                         backward)))
     (vue-ts-mode--swap-nodes element sibling)))
 
+(defmacro vue-ts-mode--with-attr-tag-at-pos (pos start-tag-var &rest body)
+  (declare (indent 2))
+  (let ((no-tag-error-message "No tag with attributes at point")
+        (element (gensym "element"))
+        (in-node-p (gensym))
+        (pos-sym (gensym "pos")))
+    `(let ((,pos-sym ,pos))
+       (if-let* ((,element (vue-ts-mode--element-at-pos ,pos-sym))
+                 (,start-tag-var (vue-ts-mode--treesit-find-child ,element "start_tag\\|self_closing_tag"))
+                 (,in-node-p (vue-ts-mode--point-in-node-p ,pos-sym ,start-tag-var)))
+           (progn
+             (when (null (treesit-filter-child ,start-tag-var (vue-ts-mode--treesit-node-type-p "attribute\\'"))))
+             ,@body)
+         (error ,no-tag-error-message)))))
+
 (defun vue-ts-mode--attributes-wrapped-p (&optional pos)
   (let ((pos (or pos (point))))
-    (let ((no-tag-error-message "No tag with attributes at point"))
-      (if-let* ((element (vue-ts-mode--element-at-pos pos))
-                (start_tag (vue-ts-mode--treesit-find-child element "start_tag\\|self_closing_tag"))
-                (_ (vue-ts-mode--point-in-node-p pos start_tag)))
-          (not
-           (eql (line-number-at-pos (treesit-node-start start_tag))
-                (line-number-at-pos (treesit-node-end start_tag))))
-        (error no-tag-error-message)))))
+    (vue-ts-mode--with-attr-tag-at-pos pos start-tag
+      (cl-loop with line-lookup = (make-hash-table)
+               for node in (cdr (treesit-node-children start-tag))
+               for start = (line-number-at-pos (treesit-node-start node))
+               for end = (line-number-at-pos (treesit-node-end node))
+
+               if (or (gethash start line-lookup)
+                      (gethash end line-lookup))
+               return nil
+
+               do (progn
+                    (puthash start t line-lookup)
+                    (puthash end t line-lookup))
+
+               finally return t))))
 
 (defun vue-ts-mode-attributes-wrap (&optional point)
   "Put all attributes on their own line."

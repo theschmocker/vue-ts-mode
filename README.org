@@ -1,6 +1,6 @@
 #+title: vue-ts-mode
 
-A work-in-progress tree-sitter-based Emacs major mode for Vue.
+A tree-sitter-based Vue major mode for Emacs.
 
 ** Features
 *** Font Lock / Syntax Highlighting
@@ -13,7 +13,12 @@ Basic indentation for templates. script/style indentation imported from their re
 Automatically set comment variables for HTML in templates and JS/TS/CSS in their respective embedded language blocks.
 
 *** imenu
-Top level <template>, <script>, and <style> tags included in imenu, as well as the simple entries from typescript-ts-mode. Plans to add JS, CSS, and possibly more granular <template> entries
+Includes:
+- Top level <template>, <script>, and <style> tags included in imenu,
+- Elements inside of <template>
+- the simple entries from typescript-ts-mode.
+
+Plans to add JS, CSS, and possibly other entries.
 
 ** Extras
 *** Auto-close HTML tags
@@ -53,7 +58,9 @@ No support for jsx/tsx
 Also: there's code in the current built-in js/ts tree-sitter font lock settings that breaks on new versions of the parsers. It's /supposed/ to handle the differences in parser versions, but it doesn't work correctly. I've got some advice in my personal config that fixes it, but I'm unsure as to whether or not I'll include that here.
 
 *** No special SCSS/Less highlighting
-Only plain CSS so far
+Only plain CSS so far. The main codebase I work in uses Less for styling, and while certain constructs result in parser errors and some syntax highlighting issues, it gets the job done.
+
+I plan to add SCSS support at some point. There's no tree-sitter grammar that I'm aware of for Less.
 
 *** Comments
 The aforementioned language specific commenting is incomplete. Basic line/region commenting works, but auto fill / comment continuation doesn't. I need to familiarize myself more with how those work in Emacs.

@@ -522,6 +522,7 @@ and end tags."
   (modify-syntax-entry ?>  "." vue-ts-mode-syntax-table)
   (modify-syntax-entry ?<  "." vue-ts-mode-syntax-table)
   (modify-syntax-entry ?=  "." vue-ts-mode-syntax-table)
+  (modify-syntax-entry ?/  "." vue-ts-mode-syntax-table)
 
   (add-hook 'pre-command-hook #'vue-ts-mode--auto-open-tag-pre-command-h nil t)
   (add-hook 'post-command-hook #'vue-ts-mode--auto-close-tag-post-command-h nil t)

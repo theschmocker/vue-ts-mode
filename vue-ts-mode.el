@@ -999,5 +999,46 @@ previous sibling."
        #'vue-ts-mode-attributes-unwrap
      #'vue-ts-mode-attributes-wrap)))
 
+(defun vue-ts-mode--replace-query-captures (node query bindings)
+  ""
+  (let ((replacements
+         ;; gather replacement and range info ahead of time.
+         ;; once edits are made, nodes will become outdated and
+         ;; cannot be queried
+         (cl-loop for (capture-symbol . capture-node) in (treesit-query-capture node query)
+                  for binding = (alist-get capture-symbol bindings)
+                  for replacement = (if (functionp binding)
+                                        (funcall binding capture-node)
+                                      binding)
+                  if replacement
+                  collect (list :range-markers (vue-ts-mode--treesit-create-node-markers capture-node)
+                                :replacement replacement))))
+    (dolist (rep replacements)
+      (cl-destructuring-bind (start . end) (plist-get rep :range-markers)
+        (goto-char start)
+        (delete-region start end)
+        (insert (plist-get rep :replacement))))))
+
+(defun vue-ts-mode-element-rename (name &optional point)
+  ""
+  (interactive "sRename element to: \n")
+  (let* ((point (or point (point)))
+         (element (vue-ts-mode--element-at-pos point)))
+    (when (not element)
+      (error "No element at point"))
+
+    (cl-flet ((tag-of-current-el-p (node)
+                (treesit-node-eq
+                 element
+                 (treesit-node-parent (treesit-node-parent node)))))
+      (save-excursion
+        (atomic-change-group
+          (vue-ts-mode--replace-query-captures
+           element
+           '((tag_name) @tag)
+           `((tag . ,(lambda (node)
+                       (when (tag-of-current-el-p node)
+                         name))))))))))
+
 (provide 'vue-ts-mode)
 ;;; vue-ts-mode.el ends here

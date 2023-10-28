@@ -18,6 +18,9 @@
 ;;
 ;;; Code:
 
+(eval-when-compile
+  (require 'let-alist))
+
 (eval-and-compile
   (require 'cl-lib))
 
@@ -63,6 +66,33 @@ arguments to the matcher function."
          (goto-char bol)
          (looking-at "-->" t))))
 
+(defun vue-ts-mode--attribute-value-content-anchor (node parent bol)
+  ""
+  (print (treesit-node-start (treesit-node-parent (treesit-node-parent parent)))))
+
+(defun vue-ts-mode--indent-attribute-content-matcher (node parent bol)
+  "Match attribute content on lines between an attribute value's quotes.
+
+Ex:
+<div
+  :class=\"{
+    someclass: somevalue <- match this
+  }\"
+/>"
+  (and (vue-ts-mode--treesit-node-type-p "attribute_value" parent)
+       (when-let (quotes (treesit-query-capture
+                          (treesit-node-parent parent)
+                          '((quoted_attribute_value
+                             "\"" @open-quote
+                             :anchor
+                             (attribute_value)
+                             :anchor
+                             "\"" @close-quote))))
+         (let-alist quotes
+           (< (line-number-at-pos (treesit-node-start .open-quote))
+              (line-number-at-pos (point))
+              (line-number-at-pos (treesit-node-start .close-quote)))))))
+
 (defvar vue-ts-mode-indent-rules
   `((vue
      (vue-ts-mode--comment-end-matcher parent-bol 0)
@@ -81,6 +111,9 @@ arguments to the matcher function."
      ((node-is "attribute") parent-bol vue-ts-mode-indent-offset)
      ((node-is "directive_attribute") parent-bol vue-ts-mode-indent-offset)
      ((parent-is "quoted_attribute_value") parent-bol 0)
+     ;; will only indent attribute content one level. Better indentation will require
+     ;; interpolated JS/TS support in directive attributes
+     (vue-ts-mode--indent-attribute-content-matcher parent-bol vue-ts-mode-indent-offset)
      ((parent-is "attribute_value") parent-bol 0)
      ((node-is "interpolation") parent-bol vue-ts-mode-indent-offset)
      ((parent-is "comment") parent-bol vue-ts-mode-indent-offset)))

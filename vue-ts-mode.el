@@ -501,8 +501,8 @@ and end tags."
 
 (define-derived-mode vue-ts-mode prog-mode "Vue"
   "Tree-sitter mode for Vue."
-  (when (treesit-ready-p 'vue)
-    (treesit-parser-create 'vue))
+  (when (not (treesit-ready-p 'vue))
+    (error "Tree-sitter parser for Vue is not available. Please ensure that the language grammar is installed"))
 
   (setq-local electric-indent-chars
               (append "{}():;,<>/=" electric-indent-chars))
@@ -563,6 +563,7 @@ and end tags."
 
   (add-hook 'vue-ts-mode-language-at-point-functions #'vue-ts-mode--language-at-point-comment-vars-function)
 
+  (setq-local treesit-primary-parser (treesit-parser-create 'vue))
   (treesit-major-mode-setup)
 
   ;; HACK: language at point is always detected as vue the first time otherwise.
